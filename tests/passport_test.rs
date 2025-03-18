@@ -19,11 +19,10 @@ mod tests {
         file.read_to_string(&mut passport_data)
             .expect("failed to read test passport data");
 
-        let passport: Passport = serde_json::from_str(&passport_data)
-            .expect("failed to parse passport");
+        let passport: Passport =
+            serde_json::from_str(&passport_data).expect("failed to parse passport");
 
-        let sod = passport.parse_sod()
-            .expect("failed to parse sod");
+        let sod = passport.parse_sod().expect("failed to parse sod");
 
         let version = sod.content.unwrap().get().version;
 
