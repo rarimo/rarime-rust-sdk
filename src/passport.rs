@@ -1,19 +1,34 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use crate::{base64, sod::SOD, RarimeError};
+use crate::{RarimeError, base64, rfc::rfc5652::SOD};
 
 #[derive(Serialize, Deserialize)]
 pub struct Passport {
-    #[serde(serialize_with="base64::serialize", deserialize_with="base64::deserialize")]
+    #[serde(
+        serialize_with = "base64::serialize",
+        deserialize_with = "base64::deserialize"
+    )]
     pub dg1: Vec<u8>,
-    #[serde(serialize_with="base64::serialize_opt", deserialize_with="base64::deserialize_opt")]
+    #[serde(
+        serialize_with = "base64::serialize_opt",
+        deserialize_with = "base64::deserialize_opt"
+    )]
     pub dg15: Option<Vec<u8>>,
-    #[serde(serialize_with="base64::serialize_opt", deserialize_with="base64::deserialize_opt")]
+    #[serde(
+        serialize_with = "base64::serialize_opt",
+        deserialize_with = "base64::deserialize_opt"
+    )]
     pub aa_sig: Option<Vec<u8>>,
-    #[serde(serialize_with="base64::serialize_opt", deserialize_with="base64::deserialize_opt")]
+    #[serde(
+        serialize_with = "base64::serialize_opt",
+        deserialize_with = "base64::deserialize_opt"
+    )]
     pub aa_challenge: Option<Vec<u8>>,
-    #[serde(serialize_with="base64::serialize", deserialize_with="base64::deserialize")]
-    pub sod: Vec<u8>
+    #[serde(
+        serialize_with = "base64::serialize",
+        deserialize_with = "base64::deserialize"
+    )]
+    pub sod: Vec<u8>,
 }
 
 impl Passport {
@@ -22,18 +37,18 @@ impl Passport {
         dg15: Option<Vec<u8>>,
         aa_sig: Option<Vec<u8>>,
         aa_challenge: Option<Vec<u8>>,
-        sod: Vec<u8>
+        sod: Vec<u8>,
     ) -> Self {
         Passport {
             dg1,
             dg15,
             aa_sig,
             aa_challenge,
-            sod
+            sod,
         }
     }
 
     pub fn parse_sod(&self) -> Result<SOD, RarimeError> {
-        Ok(asn1::parse_single::<SOD>(&self.sod)?)   
+        Ok(asn1::parse_single::<SOD>(&self.sod[4..])?)
     }
 }

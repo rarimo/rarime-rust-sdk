@@ -25,6 +25,8 @@ mod tests {
         let sod = passport.parse_sod()
             .expect("failed to parse sod");
 
-        log::info!("sod version: {sod:?}")
+        let version = sod.content.unwrap().get().version;
+
+        log::info!("sod version: {version}")
     }
 }
