@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-asn1 = "0.21.0"
+asn1 = { git = "https://github.com/rarimo/rust-asn1", rev = "19db8629e2c1591b98a204740c0438031281db69"}
 base64 = "0.22.1"
 env_logger = "0.11.7"
 lazy_static = "1.5.0"

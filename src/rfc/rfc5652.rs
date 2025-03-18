@@ -32,13 +32,6 @@ type SignatureValue<'a> = &'a [u8];
 type SignerInfos<'a> = SetOf<'a, SignerInfo<'a>>;
 
 #[derive(Asn1Read, Asn1Write)]
-pub struct SOD<'a> {
-    pub content_type: ObjectIdentifier,
-    #[implicit(0)]
-    pub content: Option<OctetStringEncoded<SignedData<'a>>>,
-}
-
-#[derive(Asn1Read, Asn1Write)]
 pub struct SignedData<'a> {
     pub version: CMSVersion,
     pub digest_algorithms: DigestAlgorithmIdentifiers<'a>,

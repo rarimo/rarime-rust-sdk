@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{RarimeError, base64, rfc::rfc5652::SOD};
+use crate::{RarimeError, base64, rfc::rfc5652::SignedData};
 
 #[derive(Serialize, Deserialize)]
 pub struct Passport {
@@ -48,7 +48,7 @@ impl Passport {
         }
     }
 
-    pub fn parse_sod(&self) -> Result<SOD, RarimeError> {
-        Ok(asn1::parse_single::<SOD>(&self.sod[4..])?)
+    pub fn parse_signed_data(&self) -> Result<SignedData, RarimeError> {
+        Ok(asn1::parse_single::<SignedData>(&self.sod[23..])?)
     }
 }

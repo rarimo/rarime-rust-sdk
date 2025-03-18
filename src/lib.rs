@@ -1,7 +1,7 @@
 pub mod passport;
+pub mod rfc;
 
 mod base64;
-mod rfc;
 
 use thiserror::Error;
 
