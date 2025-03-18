@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 
-use crate::base64;
+use crate::{base64, sod::SOD, RarimeError};
 
 #[derive(Serialize, Deserialize)]
 pub struct Passport {
@@ -31,5 +31,9 @@ impl Passport {
             aa_challenge,
             sod
         }
+    }
+
+    pub fn parse_sod(&self) -> Result<SOD, RarimeError> {
+        Ok(asn1::parse_single::<SOD>(&self.sod)?)   
     }
 }
