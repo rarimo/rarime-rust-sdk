@@ -1,6 +1,9 @@
 use asn1::*;
 
-use super::rfc5280::{Certificate, CertificateList, CertificateSerialNumber, Name};
+use super::{
+    Any,
+    rfc5280::{AlgorithmIdentifier, Certificate, CertificateList, CertificateSerialNumber, Name},
+};
 
 type CMSVersion = i64;
 
@@ -15,6 +18,18 @@ type RevocationInfoChoices<'a> = SetOf<'a, RevocationInfoChoice<'a>>;
 type SubjectKeyIdentifier<'a> = &'a [u8];
 
 type SignerIdentifier<'a> = Choice2<IssuerAndSerialNumber<'a>, SubjectKeyIdentifier<'a>>;
+
+type AttributeValue<'a> = Any<'a>;
+
+type SignedAttributes<'a> = SetOf<'a, Attribute<'a>>;
+
+type UnsignedAttributes<'a> = SetOf<'a, Attribute<'a>>;
+
+type SignatureAlgorithmIdentifier = AlgorithmIdentifier;
+
+type SignatureValue<'a> = &'a [u8];
+
+type SignerInfos<'a> = SetOf<'a, SignerInfo<'a>>;
 
 #[derive(Asn1Read, Asn1Write)]
 pub struct SOD<'a> {
@@ -32,6 +47,7 @@ pub struct SignedData<'a> {
     pub certificates: Option<CertificateSet<'a>>,
     #[implicit[1]]
     pub crls: Option<RevocationInfoChoices<'a>>,
+    pub signer_infos: SignerInfos<'a>,
 }
 
 #[derive(Asn1Read, Asn1Write)]
@@ -63,10 +79,22 @@ pub struct SignerInfo<'a> {
     pub version: CMSVersion,
     pub sid: SignerIdentifier<'a>,
     pub digest_algorithm: DigestAlgorithmIdentifier,
+    #[implicit(0)]
+    pub signed_attrs: Option<SignedAttributes<'a>>,
+    pub signature_algorithm: SignatureAlgorithmIdentifier,
+    pub signature: SignatureValue<'a>,
+    #[implicit(1)]
+    pub unsigned_attrs: Option<UnsignedAttributes<'a>>,
 }
 
 #[derive(Asn1Read, Asn1Write)]
 pub struct IssuerAndSerialNumber<'a> {
     pub issuer: Name<'a>,
     pub serial_number: CertificateSerialNumber,
+}
+
+#[derive(Asn1Read, Asn1Write)]
+pub struct Attribute<'a> {
+    attr_type: ObjectIdentifier,
+    attr_values: SetOf<'a, AttributeValue<'a>>,
 }
