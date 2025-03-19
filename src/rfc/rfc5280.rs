@@ -89,7 +89,7 @@ pub struct SubjectPublicKeyInfo<'a> {
 
 #[derive(Asn1Read, Asn1Write)]
 pub struct AttributeTypeAndValue<'a> {
-    pub attribute_type: DefinedByMarker<ObjectIdentifier>,
+    pub attribute_type: ObjectIdentifier,
     pub attribute_value: DirectoryString<'a>,
 }
 
