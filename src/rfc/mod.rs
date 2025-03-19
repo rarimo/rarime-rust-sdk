@@ -7,10 +7,11 @@ use asn1::*;
 pub enum Any<'a> {
     OctetString(&'a [u8]),
     ObjectIdentifier(ObjectIdentifier),
+    UtcTime(UtcTime),
 }
 
 #[derive(Asn1Read, Asn1Write, Debug)]
 pub struct RsaPublicKey {
-    pub data: OwnedBigInt,
-    pub modulus: i64,
+    pub modulus: OwnedBigInt,
+    pub exponent: i64,
 }
