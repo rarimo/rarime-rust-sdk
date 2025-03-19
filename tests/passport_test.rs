@@ -18,8 +18,8 @@ mod tests {
 
         let signed_data = passport.parse_signed_data().expect("failed to parse sod");
 
-        let ver = signed_data.version;
+        let signed_data_version = signed_data.version;
 
-        println!("content version: {ver}");
+        println!("signed_data_version: {signed_data_version}");
     }
 }
