@@ -1,5 +1,12 @@
 use asn1::*;
 
+use crate::RarimeError;
+
+use super::RsaPublicKey;
+
+const RSA_PUBLIC_KEY_OID: ObjectIdentifier = oid!(1, 2, 840, 113549, 1, 1, 1);
+const ECDSA_PUBLIC_KEY_OID: ObjectIdentifier = oid!(1, 2, 840, 10045, 2, 1);
+
 pub type Version = i64;
 
 pub type CertificateSerialNumber = i64;
@@ -70,7 +77,7 @@ pub struct RevokedCertificate<'a> {
     pub crl_entry_extensions: Option<Extensions<'a>>,
 }
 
-#[derive(Asn1Read, Asn1Write)]
+#[derive(Asn1Read, Asn1Write, Clone)]
 pub struct AlgorithmIdentifier {
     pub algorithm: ObjectIdentifier,
 }
@@ -81,10 +88,18 @@ pub struct Validity {
     pub not_after: Time,
 }
 
-#[derive(Asn1Read, Asn1Write)]
+#[derive(Asn1Read, Asn1Write, Clone)]
 pub struct SubjectPublicKeyInfo<'a> {
     pub algorithm: AlgorithmIdentifier,
     pub subject_public_key: BitString<'a>,
+}
+
+impl SubjectPublicKeyInfo<'_> {
+    pub fn get_rsa_public_key(&self) -> Result<RsaPublicKey, RarimeError> {
+        Ok(parse_single::<RsaPublicKey>(
+            self.subject_public_key.clone().as_bytes(),
+        )?)
+    }
 }
 
 #[derive(Asn1Read, Asn1Write)]

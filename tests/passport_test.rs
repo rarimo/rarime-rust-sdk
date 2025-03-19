@@ -21,5 +21,27 @@ mod tests {
         let signed_data_version = signed_data.version;
 
         println!("signed_data_version: {signed_data_version}");
+
+        for choice_cert in signed_data.certificates.unwrap() {
+            let cert = match choice_cert {
+                asn1::Choice1::ChoiceA(cert) => cert,
+            };
+
+            let pub_key_algorithm_id = cert
+                .tbs_certificate
+                .subject_public_key_info
+                .algorithm
+                .algorithm
+                .clone();
+
+            let pub_key = cert
+                .tbs_certificate
+                .subject_public_key_info
+                .get_rsa_public_key()
+                .unwrap();
+
+            println!("pub_key_algorithm_id: {pub_key_algorithm_id}");
+            println!("pub_key_data: {pub_key:?}");
+        }
     }
 }

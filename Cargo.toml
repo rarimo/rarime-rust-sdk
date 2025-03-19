@@ -7,6 +7,7 @@ edition = "2024"
 asn1 = { git = "https://github.com/rarimo/rust-asn1", rev = "19db8629e2c1591b98a204740c0438031281db69"}
 base64 = "0.22.1"
 env_logger = "0.11.7"
+hex = "0.4.3"
 lazy_static = "1.5.0"
 log = "0.4.26"
 serde = { version = "1.0.219", features = ["derive"]}
