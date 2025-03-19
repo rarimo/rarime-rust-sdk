@@ -15,3 +15,26 @@ pub struct RsaPublicKey {
     pub modulus: OwnedBigInt,
     pub exponent: i64,
 }
+
+#[derive(Asn1Read, Asn1Write, Clone, Debug)]
+pub struct ECDSAParameters<'a> {
+    pub version: u64,
+    pub field_id: ECDSAFieldID,
+    pub curve: ECDSACurve<'a>,
+    pub g: OwnedBitString,
+    pub n: OwnedBigUint,
+    pub h: OwnedBigUint,
+}
+
+#[derive(Asn1Read, Asn1Write, Clone, Debug)]
+pub struct ECDSAFieldID {
+    pub field_type: ObjectIdentifier,
+    pub data: OwnedBigUint,
+}
+
+#[derive(Asn1Read, Asn1Write, Clone, Debug)]
+pub struct ECDSACurve<'a> {
+    pub placeholder: &'a [u8],
+    pub a: &'a [u8],
+    pub b: &'a [u8],
+}

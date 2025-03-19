@@ -2,7 +2,7 @@
 mod tests {
     use std::{fs::File, io::Read};
 
-    use rarime_rust_sdk::passport::Passport;
+    use rarime_rust_sdk::{passport::Passport, rfc::rfc5280};
 
     #[test]
     fn test_passport_parsing() {
@@ -34,14 +34,27 @@ mod tests {
                 .algorithm
                 .clone();
 
-            let pub_key = cert
-                .tbs_certificate
-                .subject_public_key_info
-                .get_rsa_public_key()
-                .unwrap();
-
             println!("pub_key_algorithm_id: {pub_key_algorithm_id}");
-            println!("pub_key_data: {pub_key:?}");
+
+            if pub_key_algorithm_id == rfc5280::RSA_PUBLIC_KEY_OID {
+                let pub_key = cert
+                    .tbs_certificate
+                    .subject_public_key_info
+                    .get_rsa_public_key()
+                    .unwrap();
+
+                println!("pub_key_data: {pub_key:?}");
+            } else if pub_key_algorithm_id == rfc5280::ECDSA_PUBLIC_KEY_OID {
+                let pub_key = cert
+                    .tbs_certificate
+                    .subject_public_key_info
+                    .subject_public_key
+                    .as_bytes();
+
+                let pub_key_hex = hex::encode(pub_key);
+
+                println!("pub_key_data: {pub_key_hex}");
+            }
         }
     }
 }

@@ -2,10 +2,10 @@ use asn1::*;
 
 use crate::RarimeError;
 
-use super::RsaPublicKey;
+use super::{ECDSAParameters, RsaPublicKey};
 
-const RSA_PUBLIC_KEY_OID: ObjectIdentifier = oid!(1, 2, 840, 113549, 1, 1, 1);
-const ECDSA_PUBLIC_KEY_OID: ObjectIdentifier = oid!(1, 2, 840, 10045, 2, 1);
+pub const RSA_PUBLIC_KEY_OID: ObjectIdentifier = oid!(1, 2, 840, 113549, 1, 1, 1);
+pub const ECDSA_PUBLIC_KEY_OID: ObjectIdentifier = oid!(1, 2, 840, 10045, 2, 1);
 
 pub type Version = i64;
 
@@ -90,7 +90,7 @@ pub struct Validity {
 
 #[derive(Asn1Read, Asn1Write, Clone)]
 pub struct SubjectPublicKeyInfo<'a> {
-    pub algorithm: AlgorithmIdentifier,
+    pub algorithm: PublicKeyAlgorithmIdentifier<'a>,
     pub subject_public_key: BitString<'a>,
 }
 
@@ -114,6 +114,17 @@ pub struct Extension<'a> {
     #[default(false)]
     pub pubcritical: bool,
     pub extn_value: &'a [u8],
+}
+
+#[derive(Asn1Read, Asn1Write, Clone)]
+pub struct PublicKeyAlgorithmIdentifier<'a> {
+    pub algorithm: ObjectIdentifier,
+    pub paramethers: Option<PublicKeyAlgorithmParamethers<'a>>,
+}
+
+#[derive(Asn1Read, Asn1Write, Clone)]
+pub enum PublicKeyAlgorithmParamethers<'a> {
+    ECDSAPublicKeyParams(ECDSAParameters<'a>),
 }
 
 #[derive(Asn1Read, Asn1Write)]
