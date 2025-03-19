@@ -53,7 +53,7 @@ mod tests {
 
                 let pub_key_hex = hex::encode(pub_key);
 
-                println!("pub_key_data: {pub_key_hex}");
+                println!("pub_key_data: {pub_key_hex:?}");
             }
         }
     }
