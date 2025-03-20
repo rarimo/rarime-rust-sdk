@@ -1,4 +1,4 @@
-pub mod certificate_pool;
+pub mod masters_certificate_pool;
 pub mod passport;
 pub mod rfc;
 
