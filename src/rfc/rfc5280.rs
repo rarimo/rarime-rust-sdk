@@ -2,7 +2,7 @@ use asn1::*;
 
 use crate::RarimeError;
 
-use super::{ECDSAParameters, RsaPublicKey};
+use super::{ECDSAParameters, RsaPublicKey, TeletexString};
 
 pub const RSA_PUBLIC_KEY_OID: ObjectIdentifier = oid!(1, 2, 840, 113549, 1, 1, 1);
 pub const ECDSA_PUBLIC_KEY_OID: ObjectIdentifier = oid!(1, 2, 840, 10045, 2, 1);
@@ -133,5 +133,5 @@ pub enum DirectoryString<'a> {
     UniversalString(UniversalString<'a>),
     UTF8String(Utf8String<'a>),
     BMPString(BMPString<'a>),
-    TeletextString(&'a [u8]),
+    TeletexString(TeletexString<'a>),
 }

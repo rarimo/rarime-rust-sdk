@@ -37,3 +37,43 @@ pub struct ECDSACurve<'a> {
     pub a: &'a [u8],
     pub b: &'a [u8],
 }
+
+/// Type for use with `Parser.read_element` and `Writer.write_element` for
+/// handling ASN.1 `TeletexString`.  A `TeletexString` contains an `&str`
+/// with only valid characers.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TeletexString<'a>(&'a str);
+
+impl<'a> TeletexString<'a> {
+    pub fn new(s: &'a str) -> Option<TeletexString<'a>> {
+        Some(TeletexString(s))
+    }
+
+    fn new_from_bytes(s: &'a [u8]) -> Option<TeletexString<'a>> {
+        let string = match core::str::from_utf8(s).ok() {
+            Some(string) => string,
+            None => return None,
+        };
+
+        Some(TeletexString(string))
+    }
+
+    pub fn as_str(&self) -> &'a str {
+        self.0
+    }
+}
+
+impl<'a> SimpleAsn1Readable<'a> for TeletexString<'a> {
+    const TAG: Tag = Tag::primitive(0x14);
+    fn parse_data(data: &'a [u8]) -> ParseResult<Self> {
+        TeletexString::new_from_bytes(data)
+            .ok_or_else(|| ParseError::new(ParseErrorKind::InvalidValue))
+    }
+}
+
+impl SimpleAsn1Writable for TeletexString<'_> {
+    const TAG: Tag = Tag::primitive(0x14);
+    fn write_data(&self, dest: &mut WriteBuf) -> WriteResult {
+        dest.push_slice(self.0.as_bytes())
+    }
+}
