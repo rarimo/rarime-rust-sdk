@@ -1,3 +1,4 @@
+pub mod certificate_pool;
 pub mod passport;
 pub mod rfc;
 
