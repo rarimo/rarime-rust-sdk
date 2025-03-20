@@ -77,3 +77,42 @@ impl SimpleAsn1Writable for TeletexString<'_> {
         dest.push_slice(self.0.as_bytes())
     }
 }
+
+/// Type for use with `Parser.read_element` and `Writer.write_element` for
+/// handling ASN.1 `IA5String`.  A `IA5String` contains an `&str`
+/// with only valid characers.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct IA5String<'a>(&'a str);
+
+impl<'a> IA5String<'a> {
+    pub fn new(s: &'a str) -> Option<IA5String<'a>> {
+        Some(IA5String(s))
+    }
+
+    fn new_from_bytes(s: &'a [u8]) -> Option<IA5String<'a>> {
+        let string = match core::str::from_utf8(s).ok() {
+            Some(string) => string,
+            None => return None,
+        };
+
+        Some(IA5String(string))
+    }
+
+    pub fn as_str(&self) -> &'a str {
+        self.0
+    }
+}
+
+impl<'a> SimpleAsn1Readable<'a> for IA5String<'a> {
+    const TAG: Tag = Tag::primitive(0x16);
+    fn parse_data(data: &'a [u8]) -> ParseResult<Self> {
+        IA5String::new_from_bytes(data).ok_or_else(|| ParseError::new(ParseErrorKind::InvalidValue))
+    }
+}
+
+impl SimpleAsn1Writable for IA5String<'_> {
+    const TAG: Tag = Tag::primitive(0x16);
+    fn write_data(&self, dest: &mut WriteBuf) -> WriteResult {
+        dest.push_slice(self.0.as_bytes())
+    }
+}

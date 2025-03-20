@@ -9,7 +9,7 @@ pub const ECDSA_PUBLIC_KEY_OID: ObjectIdentifier = oid!(1, 2, 840, 10045, 2, 1);
 
 pub type Version = i64;
 
-pub type CertificateSerialNumber = OwnedBigUint;
+pub type CertificateSerialNumber = OwnedBigInt;
 
 pub type Name<'a> = Choice1<RDNSequence<'a>>;
 
@@ -134,4 +134,5 @@ pub enum DirectoryString<'a> {
     UTF8String(Utf8String<'a>),
     BMPString(BMPString<'a>),
     TeletexString(TeletexString<'a>),
+    IA5String(IA5String<'a>),
 }

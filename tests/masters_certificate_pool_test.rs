@@ -17,10 +17,6 @@ mod tests {
 
         let mut master_certificates: Vec<rfc5280::Certificate> = vec![];
         for master_pem in &masters_pems {
-            let master_pem_str = hex::encode(master_pem.contents());
-
-            println!("master_pem_str: {master_pem_str}");
-
             let certificate: rfc5280::Certificate =
                 asn1::parse_single(master_pem.contents()).expect("failed to parse master_pem");
 
