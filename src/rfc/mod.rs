@@ -3,6 +3,18 @@ pub mod rfc5652;
 
 use asn1::*;
 
+pub const RSA_PUBLIC_KEY_OID: ObjectIdentifier = oid!(1, 2, 840, 113549, 1, 1, 1);
+pub const ECDSA_PUBLIC_KEY_OID: ObjectIdentifier = oid!(1, 2, 840, 10045, 2, 1);
+
+pub const RSA_WITH_SHA1: ObjectIdentifier = oid!(1, 2, 840, 113549, 1, 1, 5);
+pub const RSA_WITH_SHA256: ObjectIdentifier = oid!(1, 2, 840, 113549, 1, 1, 11);
+pub const RSA_WITH_SHA384: ObjectIdentifier = oid!(1, 2, 840, 113549, 1, 1, 12);
+pub const RSA_WITH_SHA512: ObjectIdentifier = oid!(1, 2, 840, 113549, 1, 1, 13);
+pub const ECDSA_WITH_SHA1: ObjectIdentifier = oid!(1, 2, 840, 10045, 4, 1);
+pub const ECDSA_WITH_SHA256: ObjectIdentifier = oid!(1, 2, 840, 10045, 4, 3, 2);
+pub const ECDSA_WITH_SHA384: ObjectIdentifier = oid!(1, 2, 840, 10045, 4, 3, 3);
+pub const ECDSA_WITH_SHA512: ObjectIdentifier = oid!(1, 2, 840, 10045, 4, 3, 4);
+
 #[derive(Asn1Read, Asn1Write)]
 pub enum Any<'a> {
     OctetString(&'a [u8]),

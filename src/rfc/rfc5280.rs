@@ -4,9 +4,6 @@ use crate::RarimeError;
 
 use super::{ECDSAParameters, RsaPublicKey, TeletexString};
 
-pub const RSA_PUBLIC_KEY_OID: ObjectIdentifier = oid!(1, 2, 840, 113549, 1, 1, 1);
-pub const ECDSA_PUBLIC_KEY_OID: ObjectIdentifier = oid!(1, 2, 840, 10045, 2, 1);
-
 pub type Version = i64;
 
 pub type CertificateSerialNumber = OwnedBigInt;

@@ -10,4 +10,6 @@ use thiserror::Error;
 pub enum RarimeError {
     #[error("failed to parse asn1 data")]
     ASN1ParseError(#[from] asn1::ParseError),
+    #[error("failed to perform RSA operation")]
+    RSAError(#[from] rsa::errors::Error),
 }
