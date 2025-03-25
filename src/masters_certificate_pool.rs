@@ -24,12 +24,12 @@ impl<'a> MastersCertificatePool<'a> {
         slave: &rfc5280::Certificate<'a>,
     ) -> Result<Option<&rfc5280::Certificate<'a>>, RarimeError> {
         for master in &self.masters {
-            if slave.signature_algorithm.algorithm
+            if slave.signature_algorithm.get_signature_type()
                 != master
                     .tbs_certificate
                     .subject_public_key_info
                     .algorithm
-                    .algorithm
+                    .get_signature_type()
             {
                 continue;
             }

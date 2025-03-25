@@ -15,6 +15,12 @@ pub const ECDSA_WITH_SHA256: ObjectIdentifier = oid!(1, 2, 840, 10045, 4, 3, 2);
 pub const ECDSA_WITH_SHA384: ObjectIdentifier = oid!(1, 2, 840, 10045, 4, 3, 3);
 pub const ECDSA_WITH_SHA512: ObjectIdentifier = oid!(1, 2, 840, 10045, 4, 3, 4);
 
+#[derive(PartialEq, Debug)]
+pub enum SignatureType {
+    RSA,
+    ECDSA,
+}
+
 #[derive(Asn1Read, Asn1Write)]
 pub enum Any<'a> {
     OctetString(&'a [u8]),

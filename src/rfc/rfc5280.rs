@@ -1,6 +1,6 @@
 use asn1::*;
 
-use crate::RarimeError;
+use crate::{RarimeError, rfc};
 
 use super::{ECDSAParameters, RsaPublicKey, TeletexString};
 
@@ -79,6 +79,22 @@ pub struct AlgorithmIdentifier {
     pub algorithm: ObjectIdentifier,
 }
 
+impl AlgorithmIdentifier {
+    pub fn get_signature_type(&self) -> Option<rfc::SignatureType> {
+        match self.algorithm {
+            rfc::RSA_WITH_SHA1
+            | rfc::RSA_WITH_SHA256
+            | rfc::RSA_WITH_SHA384
+            | rfc::RSA_WITH_SHA512 => Some(rfc::SignatureType::RSA),
+            rfc::ECDSA_WITH_SHA1
+            | rfc::ECDSA_WITH_SHA256
+            | rfc::ECDSA_WITH_SHA384
+            | rfc::ECDSA_WITH_SHA512 => Some(rfc::SignatureType::ECDSA),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Asn1Read, Asn1Write)]
 pub struct Validity {
     pub not_before: Time,
@@ -117,6 +133,16 @@ pub struct Extension<'a> {
 pub struct PublicKeyAlgorithmIdentifier<'a> {
     pub algorithm: ObjectIdentifier,
     pub paramethers: Option<PublicKeyAlgorithmParamethers<'a>>,
+}
+
+impl PublicKeyAlgorithmIdentifier<'_> {
+    pub fn get_signature_type(&self) -> Option<rfc::SignatureType> {
+        match self.algorithm {
+            rfc::RSA_PUBLIC_KEY_OID => Some(rfc::SignatureType::RSA),
+            rfc::ECDSA_PUBLIC_KEY_OID => Some(rfc::SignatureType::ECDSA),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Asn1Read, Asn1Write, Clone)]
