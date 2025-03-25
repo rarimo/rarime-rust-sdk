@@ -463,6 +463,7 @@ version = "0.1.0"
 dependencies = [
  "asn1",
  "base64",
+ "const-oid",
  "digest",
  "env_logger",
  "hex",
@@ -521,6 +522,7 @@ dependencies = [
  "pkcs1",
  "pkcs8",
  "rand_core",
+ "sha1",
  "sha2",
  "signature",
  "spki",

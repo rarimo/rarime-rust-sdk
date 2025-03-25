@@ -14,4 +14,6 @@ pub enum RarimeError {
     ASN1WriteError(#[from] asn1::WriteError),
     #[error("failed to perform RSA operation")]
     RSAError(#[from] rsa::errors::Error),
+    #[error("unsupported signature algorithm")]
+    UnsupportedSignatureAlgorithm,
 }

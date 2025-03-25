@@ -73,13 +73,12 @@ impl<'a> MastersCertificatePool<'a> {
         let master_public_key =
             rsa::RsaPublicKey::new(x509_rsa_public_key_n, x509_rsa_public_key_e)?;
 
+        let hasher = Self::get_pkcs1v15_hasher(&slave.signature_algorithm.algorithm)
+            .ok_or(RarimeError::UnsupportedSignatureAlgorithm)?;
+
         let hashed = Self::hash_certificate(slave)?;
 
-        match master_public_key.verify(
-            rsa::pkcs1v15::Pkcs1v15Sign::new::<sha2::Sha256>(),
-            &hashed,
-            slave.signature_value.as_bytes(),
-        ) {
+        match master_public_key.verify(hasher, &hashed, slave.signature_value.as_bytes()) {
             Ok(_) => return Ok(true),
             Err(_) => return Ok(false),
         }
@@ -91,6 +90,26 @@ impl<'a> MastersCertificatePool<'a> {
         master: &rfc5280::Certificate<'a>,
     ) -> Result<bool, RarimeError> {
         Ok(false)
+    }
+
+    fn get_pkcs1v15_hasher(
+        hash_id: &asn1::ObjectIdentifier,
+    ) -> Option<rsa::pkcs1v15::Pkcs1v15Sign> {
+        match *hash_id {
+            rfc::RSA_WITH_SHA1 | rfc::ECDSA_WITH_SHA1 => {
+                Some(rsa::pkcs1v15::Pkcs1v15Sign::new::<sha1::Sha1>())
+            }
+            rfc::RSA_WITH_SHA256 | rfc::ECDSA_WITH_SHA256 => {
+                Some(rsa::pkcs1v15::Pkcs1v15Sign::new::<sha2::Sha256>())
+            }
+            rfc::RSA_WITH_SHA384 | rfc::ECDSA_WITH_SHA384 => {
+                Some(rsa::pkcs1v15::Pkcs1v15Sign::new::<sha2::Sha384>())
+            }
+            rfc::RSA_WITH_SHA512 | rfc::ECDSA_WITH_SHA512 => {
+                Some(rsa::pkcs1v15::Pkcs1v15Sign::new::<sha2::Sha512>())
+            }
+            _ => None,
+        }
     }
 
     fn hash_certificate(slave: &rfc5280::Certificate<'a>) -> Result<Vec<u8>, RarimeError> {
