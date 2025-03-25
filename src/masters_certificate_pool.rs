@@ -66,6 +66,12 @@ impl<'a> MastersCertificatePool<'a> {
             .tbs_certificate
             .subject_public_key_info
             .get_rsa_public_key()?;
+
+        // TODO: find a way to handle more
+        if x509_rsa_public_key.modulus.as_bytes().len() > 512 {
+            return Ok(false);
+        }
+
         let x509_rsa_public_key_n = BigUint::from_bytes_be(x509_rsa_public_key.modulus.as_bytes());
         let x509_rsa_public_key_e =
             BigUint::from_bytes_be(&x509_rsa_public_key.exponent.to_be_bytes());

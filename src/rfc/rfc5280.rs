@@ -150,7 +150,7 @@ pub enum PublicKeyAlgorithmParamethers<'a> {
     ECDSAPublicKeyParams(ECDSAParameters<'a>),
 }
 
-#[derive(Asn1Read, Asn1Write)]
+#[derive(Asn1Read, Asn1Write, Debug)]
 pub enum DirectoryString<'a> {
     PrintableString(PrintableString<'a>),
     UniversalString(UniversalString<'a>),
