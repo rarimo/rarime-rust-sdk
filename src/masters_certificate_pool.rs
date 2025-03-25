@@ -85,6 +85,7 @@ impl<'a> MastersCertificatePool<'a> {
         }
     }
 
+    #[allow(unused_variables)]
     fn check_ecdsa(
         slave: &rfc5280::Certificate<'a>,
         master: &rfc5280::Certificate<'a>,
