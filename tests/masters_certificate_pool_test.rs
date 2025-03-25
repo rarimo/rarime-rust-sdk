@@ -48,6 +48,17 @@ mod tests {
         let mut masters_certificate_pool = MastersCertificatePool::new();
         masters_certificate_pool.add_masters(master_certificates);
 
-        masters_certificate_pool.find_master(slave);
+        let master = masters_certificate_pool
+            .find_master(&slave)
+            .expect("failed to find master");
+
+        match master {
+            Some(_) => {
+                println!("master found");
+            }
+            None => {
+                println!("master not found");
+            }
+        }
     }
 }

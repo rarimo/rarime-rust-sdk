@@ -19,17 +19,48 @@ impl<'a> MastersCertificatePool<'a> {
         self.masters.append(&mut certificates_to_add);
     }
 
-    pub fn find_master(&self, slave: rfc5280::Certificate<'a>) {
-        let signature_algorithm = slave.signature_algorithm.algorithm;
-        let signature = hex::encode(slave.signature_value.as_bytes());
+    pub fn find_master(
+        &self,
+        slave: &rfc5280::Certificate<'a>,
+    ) -> Result<Option<&rfc5280::Certificate<'a>>, RarimeError> {
+        for master in &self.masters {
+            if slave.signature_algorithm.algorithm
+                != master
+                    .tbs_certificate
+                    .subject_public_key_info
+                    .algorithm
+                    .algorithm
+            {
+                continue;
+            }
 
-        println!("signature_algorithm: {signature_algorithm}");
-        println!("signature: {signature}");
+            match slave.signature_algorithm.algorithm {
+                rfc::RSA_WITH_SHA1
+                | rfc::RSA_WITH_SHA256
+                | rfc::RSA_WITH_SHA384
+                | rfc::RSA_WITH_SHA512 => {
+                    if Self::check_rsa(slave, master)? {
+                        return Ok(Some(master));
+                    }
+                }
+                rfc::ECDSA_WITH_SHA1
+                | rfc::ECDSA_WITH_SHA256
+                | rfc::ECDSA_WITH_SHA384
+                | rfc::ECDSA_WITH_SHA512 => {
+                    if Self::check_ecdsa(slave, master)? {
+                        return Ok(Some(master));
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        return Ok(None);
     }
 
     fn check_rsa(
-        slave: rfc5280::Certificate<'a>,
-        master: rfc5280::Certificate<'a>,
+        slave: &rfc5280::Certificate<'a>,
+        master: &rfc5280::Certificate<'a>,
     ) -> Result<bool, RarimeError> {
         let x509_rsa_public_key = master
             .tbs_certificate
@@ -42,41 +73,42 @@ impl<'a> MastersCertificatePool<'a> {
         let master_public_key =
             rsa::RsaPublicKey::new(x509_rsa_public_key_n, x509_rsa_public_key_e)?;
 
-        // master_public_key.verify(
-        //     rsa::pkcs1v15::Pkcs1v15Sign::new(),
-        //     hashed,
-        //     slave.signature_value.as_bytes(),
-        // );
+        let hashed = Self::hash_certificate(slave)?;
 
+        match master_public_key.verify(
+            rsa::pkcs1v15::Pkcs1v15Sign::new::<sha2::Sha256>(),
+            &hashed,
+            slave.signature_value.as_bytes(),
+        ) {
+            Ok(_) => return Ok(true),
+            Err(_) => return Ok(false),
+        }
+    }
+
+    fn check_ecdsa(
+        slave: &rfc5280::Certificate<'a>,
+        master: &rfc5280::Certificate<'a>,
+    ) -> Result<bool, RarimeError> {
         Ok(false)
     }
 
-    fn hash_certificate(slave: rfc5280::Certificate<'a>) {
-        let to_hash_data = slave.signature_value.as_bytes();
+    fn hash_certificate(slave: &rfc5280::Certificate<'a>) -> Result<Vec<u8>, RarimeError> {
+        let to_hash_data = asn1::write_single(&slave.tbs_certificate)?;
 
-        let mut hash: Vec<u8> = vec![];
-        match slave.signature_algorithm.algorithm {
-            rfc::RSA_WITH_SHA1 | rfc::ECDSA_WITH_SHA1 => {
-                let mut hasher = sha1::Sha1::new();
-                hasher.update(to_hash_data);
-                let output = hasher.finalize();
-            }
+        let hash = match slave.signature_algorithm.algorithm {
+            rfc::RSA_WITH_SHA1 | rfc::ECDSA_WITH_SHA1 => sha1::Sha1::digest(to_hash_data).to_vec(),
             rfc::RSA_WITH_SHA256 | rfc::ECDSA_WITH_SHA256 => {
-                let mut hasher = sha2::Sha256::new();
-                hasher.update(to_hash_data);
-                let output = hasher.finalize();
+                sha2::Sha256::digest(to_hash_data).to_vec()
             }
             rfc::RSA_WITH_SHA384 | rfc::ECDSA_WITH_SHA384 => {
-                let mut hasher = sha2::Sha384::new();
-                hasher.update(to_hash_data);
-                let output = hasher.finalize();
+                sha2::Sha384::digest(to_hash_data).to_vec()
             }
             rfc::RSA_WITH_SHA512 | rfc::ECDSA_WITH_SHA512 => {
-                let mut hasher = sha2::Sha512::new();
-                hasher.update(to_hash_data);
-                let output = hasher.finalize();
+                sha2::Sha512::digest(to_hash_data).to_vec()
             }
-            _ => {}
-        }
+            _ => vec![],
+        };
+
+        Ok(hash)
     }
 }
