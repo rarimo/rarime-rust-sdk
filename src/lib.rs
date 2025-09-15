@@ -1,14 +1,19 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+pub mod masters_certificate_pool;
+pub mod passport;
+pub mod rfc;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+mod base64;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum RarimeError {
+    #[error("failed to parse asn1 data")]
+    ASN1ParseError(#[from] asn1::ParseError),
+    #[error("failed to write asn1 data")]
+    ASN1WriteError(#[from] asn1::WriteError),
+    #[error("failed to perform RSA operation")]
+    RSAError(#[from] rsa::errors::Error),
+    #[error("unsupported signature algorithm")]
+    UnsupportedSignatureAlgorithm,
 }
