@@ -1,2 +1,6 @@
 /target
 /tests/assets/test_passport.json
+
+.idea/
+.vscode/
+.DS_Store
