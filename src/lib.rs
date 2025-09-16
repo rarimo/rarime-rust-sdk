@@ -5,6 +5,7 @@ pub mod rfc;
 mod base64;
 mod owned_cert;
 mod treap_tree;
+mod utils;
 
 use ::base64::DecodeError;
 use thiserror::Error;
