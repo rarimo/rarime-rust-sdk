@@ -62,6 +62,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.99"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b0674a1ddeecb70197781e945de4b3b8ffb61fa939a5597bcf48503737663100"
+
+[[package]]
 name = "arrayref"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -868,6 +874,7 @@ dependencies = [
 name = "rarime-rust-sdk"
 version = "0.1.0"
 dependencies = [
+    "anyhow",
  "asn1",
  "babyjubjub-rs",
  "base64",
@@ -891,6 +898,7 @@ dependencies = [
  "sha1",
  "sha2",
  "sha3",
+    "simple_asn1",
  "thiserror",
  "x509-parser",
 ]
@@ -1048,6 +1056,18 @@ checksum = "77549399552de45a898a580c1b41d445bf730df867cc44e6c0233bbc4b8329de"
 dependencies = [
  "digest 0.10.7",
  "rand_core 0.6.4",
+]
+
+[[package]]
+name = "simple_asn1"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "297f631f50729c8c99b84667867963997ec0b50f32b2a7dbcab828ef0541e8bb"
+dependencies = [
+    "num-bigint 0.4.6",
+    "num-traits",
+    "thiserror",
+    "time",
 ]
 
 [[package]]

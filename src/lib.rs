@@ -3,6 +3,8 @@ pub mod passport;
 pub mod rfc;
 
 mod base64;
+mod document;
+mod flow;
 mod owned_cert;
 mod treap_tree;
 mod utils;
@@ -32,4 +34,8 @@ pub enum RarimeError {
     DecodeError(#[from] DecodeError),
     #[error("Der error: {0}")]
     DerError(String),
+    #[error("Unsupported type of pub key")]
+    UnsupportedKey,
+    #[error("Parsing DG15 error")]
+    ParseDg15Error(anyhow::Error),
 }
