@@ -1,7 +1,7 @@
 use crate::RarimeError;
 use anyhow::Context;
 use num_bigint::BigInt;
-use simple_asn1::{ASN1Block, BigUint, from_der};
+use simple_asn1::{ASN1Block, ASN1Class, BigUint, from_der};
 
 pub enum ActiveAuthKey {
     Rsa { modulus: BigInt, exponent: BigInt },
@@ -29,6 +29,7 @@ impl RarimeDocument {
                 }
             }
         }
+        let sign_attr = Self::extract_authenticated_attributes(&self.sod);
         todo!()
     }
 
@@ -72,6 +73,53 @@ impl RarimeDocument {
         Ok(ActiveAuthKey::Ecdsa {
             key_bytes: bitstring.clone(),
         })
+    }
+
+    fn extract_authenticated_attributes(sod_bytes: &[u8]) -> anyhow::Result<ASN1Block> {
+        let blocks = from_der(sod_bytes).context("Failed to parse DER")?;
+
+        let app23_seq = match &blocks[0] {
+            ASN1Block::Explicit(class, _, tag, content)
+                if *class == ASN1Class::Application && *tag == BigUint::from(23u32) =>
+            {
+                match content.as_ref() {
+                    ASN1Block::Sequence(_, inner) => inner,
+                    _ => anyhow::bail!("Expected SEQUENCE inside Application 23"),
+                }
+            }
+            _ => anyhow::bail!("Expected Application 23"),
+        };
+
+        let tagged0 = app23_seq
+            .iter()
+            .find_map(|b| {
+                if let ASN1Block::Explicit(_, _, tag, content) = b {
+                    if *tag == BigUint::from(0u32) {
+                        return Some(content.as_ref());
+                    }
+                }
+                None
+            })
+            .context("No [0] tagged block found in Application 23 SEQUENCE")?;
+
+        let inner_seq = match tagged0 {
+            ASN1Block::Sequence(_, inner) => inner,
+            _ => anyhow::bail!("Expected SEQUENCE inside [0]"),
+        };
+
+        let final_block = inner_seq
+            .iter()
+            .find_map(|b| {
+                if let ASN1Block::Explicit(_, _, tag, content) = b {
+                    if *tag == BigUint::from(0u32) {
+                        return Some(content.as_ref().clone());
+                    }
+                }
+                None
+            })
+            .context("No inner [0] tagged block found")?;
+
+        Ok(final_block)
     }
 }
 
