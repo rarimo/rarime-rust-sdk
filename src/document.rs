@@ -38,11 +38,9 @@ impl RarimeDocument {
             }
         }
 
-        // Passport without DG15 flow
         let sign_attr = Self::extract_authenticated_attributes(&self.sod)
             .map_err(|e| RarimeError::GetPassportKeyError(e.into()))?;
 
-        // Извлекаем алгоритм хеширования
         let hash_algorithm = extract_hash_algorithm(&self.sod)
             .map_err(|e| RarimeError::GetPassportKeyError(e.into()))?;
 
