@@ -152,7 +152,7 @@ dependencies = [
  "num",
  "num-bigint 0.4.6",
  "num-traits",
-    "poseidon-rs 0.0.8",
+ "poseidon-rs 0.0.8",
  "rand 0.8.5",
 ]
 
@@ -785,9 +785,9 @@ version = "0.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7bd44e953add4c619a75a970cc4335e3175dfecc61ab64ee6caa8fffde95c95"
 dependencies = [
-    "ff_ce",
-    "rand 0.4.6",
-    "serde_json",
+ "ff_ce",
+ "rand 0.4.6",
+ "serde_json",
 ]
 
 [[package]]
@@ -885,7 +885,7 @@ dependencies = [
 name = "rarime-rust-sdk"
 version = "0.1.0"
 dependencies = [
-    "anyhow",
+ "anyhow",
  "asn1",
  "babyjubjub-rs",
  "base64",
@@ -895,7 +895,7 @@ dependencies = [
  "der-parser",
  "digest 0.10.7",
  "env_logger",
-    "ff_ce",
+ "ff_ce",
  "hex",
  "lazy_static",
  "log",
@@ -903,7 +903,7 @@ dependencies = [
  "num-bigint-dig",
  "num-traits",
  "pem",
-    "poseidon-rs 0.0.10",
+ "poseidon-rs 0.0.10",
  "regex",
  "rsa",
  "serde",
@@ -911,7 +911,7 @@ dependencies = [
  "sha1",
  "sha2",
  "sha3",
-    "simple_asn1",
+ "simple_asn1",
  "thiserror",
  "x509-parser",
 ]
@@ -1077,10 +1077,10 @@ version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "297f631f50729c8c99b84667867963997ec0b50f32b2a7dbcab828ef0541e8bb"
 dependencies = [
-    "num-bigint 0.4.6",
-    "num-traits",
-    "thiserror",
-    "time",
+ "num-bigint 0.4.6",
+ "num-traits",
+ "thiserror",
+ "time",
 ]
 
 [[package]]

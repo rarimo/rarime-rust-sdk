@@ -1,10 +1,13 @@
 use crate::{RarimeError, utils};
 use anyhow::{Context, anyhow};
+use digest::Digest;
 use ff::*;
 use num_bigint::BigInt;
 use num_traits::{One, Zero};
 use poseidon_rs::{Fr, Poseidon};
-use simple_asn1::{ASN1Block, ASN1Class, BigUint, from_der};
+use sha1::Sha1;
+use sha2::{Sha224, Sha256, Sha384, Sha512};
+use simple_asn1::{ASN1Block, ASN1Class, BigUint, from_der, to_der};
 
 pub enum ActiveAuthKey {
     Rsa { modulus: BigInt, exponent: BigInt },
@@ -34,10 +37,36 @@ impl RarimeDocument {
                 }
             }
         }
-        //  Passport without DG15 flow
-        let sign_attr = Self::extract_authenticated_attributes(&self.sod);
-        todo!()
+
+        // Passport without DG15 flow
+        let sign_attr = Self::extract_authenticated_attributes(&self.sod)
+            .map_err(|e| RarimeError::GetPassportKeyError(e.into()))?;
+
+        // Извлекаем алгоритм хеширования
+        let hash_algorithm = extract_hash_algorithm(&self.sod)
+            .map_err(|e| RarimeError::GetPassportKeyError(e.into()))?;
+
+        let parsed_hash_algorithm = parse_hash_algorithm(&hash_algorithm)
+            .map_err(|e| RarimeError::GetPassportKeyError(e.into()))?;
+
+        let sign_attr_bytes =
+            to_der(&sign_attr).map_err(|e| RarimeError::GetPassportKeyError(e.into()))?;
+
+        let hash_bytes = match parsed_hash_algorithm {
+            SignatureDigestHashAlgorithm::SHA1 => Sha1::digest(&sign_attr_bytes).to_vec(),
+            SignatureDigestHashAlgorithm::SHA224 => Sha224::digest(&sign_attr_bytes).to_vec(),
+            SignatureDigestHashAlgorithm::SHA256 => Sha256::digest(&sign_attr_bytes).to_vec(),
+            SignatureDigestHashAlgorithm::SHA384 => Sha384::digest(&sign_attr_bytes).to_vec(),
+            SignatureDigestHashAlgorithm::SHA512 => Sha512::digest(&sign_attr_bytes).to_vec(),
+        };
+
+        let mut hash = [0u8; 32];
+        let len = std::cmp::min(hash_bytes.len(), 32);
+        hash[..len].copy_from_slice(&hash_bytes[..len]);
+
+        Ok(hash)
     }
+
     fn extract_ecdsa_passport_key(key_bytes: &[u8]) -> Result<[u8; 32], anyhow::Error> {
         let x = BigInt::from_bytes_be(num_bigint::Sign::Plus, &key_bytes[..32]);
         let y = BigInt::from_bytes_be(num_bigint::Sign::Plus, &key_bytes[33..]);
