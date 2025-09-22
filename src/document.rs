@@ -187,16 +187,119 @@ impl RarimeDocument {
         let final_block = inner_seq
             .iter()
             .find_map(|b| {
-                if let ASN1Block::Explicit(_, _, tag, content) = b {
-                    if *tag == BigUint::from(0u32) {
-                        return Some(content.as_ref().clone());
+                if let ASN1Block::Set(_, content) = b {
+                    if let Some(ASN1Block::Sequence(_, inner)) = content.get(0) {
+                        if inner.len() == 6 {
+                            return Some(ASN1Block::Sequence(inner.len(), inner.clone()));
+                        }
                     }
                 }
                 None
             })
-            .context("No inner [0] tagged block found")?;
+            .context("No inner SET containing 6-element SEQUENCE found")?;
 
         Ok(final_block)
+    }
+}
+
+#[derive(Debug)]
+enum SignatureDigestHashAlgorithm {
+    SHA1,
+    SHA224,
+    SHA256,
+    SHA384,
+    SHA512,
+}
+fn extract_hash_algorithm(sod_bytes: &[u8]) -> anyhow::Result<ASN1Block> {
+    let blocks = from_der(sod_bytes).context("Failed to parse DER")?;
+
+    let app23_seq = match &blocks[0] {
+        ASN1Block::Explicit(class, _, tag, content)
+            if *class == ASN1Class::Application && *tag == BigUint::from(23u32) =>
+        {
+            match content.as_ref() {
+                ASN1Block::Sequence(_, inner) => inner,
+                _ => anyhow::bail!("Expected SEQUENCE inside Application 23"),
+            }
+        }
+        _ => anyhow::bail!("Expected Application 23"),
+    };
+
+    let tagged0 = app23_seq
+        .iter()
+        .find_map(|b| {
+            if let ASN1Block::Explicit(_, _, tag, content) = b {
+                if *tag == BigUint::from(0u32) {
+                    return Some(content.as_ref());
+                }
+            }
+            None
+        })
+        .context("No [0] tagged block found in Application 23 SEQUENCE")?;
+
+    let inner_seq = match tagged0 {
+        ASN1Block::Sequence(_, inner) => inner,
+        _ => anyhow::bail!("Expected SEQUENCE inside [0]"),
+    };
+
+    let sequence_block = inner_seq
+        .iter()
+        .find_map(|b| {
+            if let ASN1Block::Set(_, content) = b {
+                if let Some(ASN1Block::Sequence(_, inner)) = content.get(0) {
+                    if inner.len() == 6 {
+                        return Some(inner.clone());
+                    }
+                }
+            }
+            None
+        })
+        .context("No inner SET containing 6-element SEQUENCE found")?;
+
+    let sig_alg_block = sequence_block
+        .iter()
+        .find_map(|b| {
+            if let ASN1Block::Sequence(_, inner) = b {
+                if inner.len() == 2 {
+                    if let ASN1Block::ObjectIdentifier(tag, oid) = &inner[0] {
+                        let oid_string = oid
+                            .as_vec::<&BigUint>()
+                            .unwrap()
+                            .iter()
+                            .map(|n| n.to_string())
+                            .collect::<Vec<_>>()
+                            .join(".");
+                        if (oid_string.starts_with("1.2.840.113549.1.1")) {
+                            return Some(ASN1Block::ObjectIdentifier(*tag, oid.clone()));
+                        }
+                    }
+                }
+            }
+            None
+        })
+        .context("No RSA+SHA signature algorithm OID found")?;
+
+    Ok(sig_alg_block)
+}
+fn parse_hash_algorithm(oid: &ASN1Block) -> anyhow::Result<SignatureDigestHashAlgorithm> {
+    let oid_string = if let ASN1Block::ObjectIdentifier(_, oid) = oid {
+        oid.as_vec::<&BigUint>()
+            .unwrap()
+            .iter()
+            .map(|n| n.to_string())
+            .collect::<Vec<_>>()
+            .join(".")
+    } else {
+        anyhow::bail!("Not an ObjectIdentifier");
+    };
+
+    match oid_string.as_str() {
+        "1.2.840.113549.1.1.5" => Ok(SignatureDigestHashAlgorithm::SHA1),
+        "1.2.840.113549.1.1.14" => Ok(SignatureDigestHashAlgorithm::SHA224),
+        "1.2.840.113549.1.1.11" => Ok(SignatureDigestHashAlgorithm::SHA256),
+        "1.2.840.113549.1.1.12" => Ok(SignatureDigestHashAlgorithm::SHA384),
+        "1.2.840.113549.1.1.13" => Ok(SignatureDigestHashAlgorithm::SHA512),
+        _ => anyhow::bail!("Unknown or unsupported RSA+SHA OID: {}", oid_string),
     }
 }
 
