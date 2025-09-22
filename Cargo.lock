@@ -152,7 +152,7 @@ dependencies = [
  "num",
  "num-bigint 0.4.6",
  "num-traits",
- "poseidon-rs",
+    "poseidon-rs 0.0.8",
  "rand 0.8.5",
 ]
 
@@ -780,6 +780,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "poseidon-rs"
+version = "0.0.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f7bd44e953add4c619a75a970cc4335e3175dfecc61ab64ee6caa8fffde95c95"
+dependencies = [
+    "ff_ce",
+    "rand 0.4.6",
+    "serde_json",
+]
+
+[[package]]
 name = "powerfmt"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -884,6 +895,7 @@ dependencies = [
  "der-parser",
  "digest 0.10.7",
  "env_logger",
+    "ff_ce",
  "hex",
  "lazy_static",
  "log",
@@ -891,6 +903,7 @@ dependencies = [
  "num-bigint-dig",
  "num-traits",
  "pem",
+    "poseidon-rs 0.0.10",
  "regex",
  "rsa",
  "serde",

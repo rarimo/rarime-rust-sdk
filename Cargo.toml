@@ -31,3 +31,5 @@ der-parser = "10.0.0"
 babyjubjub-rs = { version = "0.0.11", features = ["aarch64"] }
 simple_asn1 = "0.6.3"
 anyhow = "1.0"
+poseidon-rs = "0.0.10"
+ff = { package = "ff_ce", version = "0.11", features = ["derive"] }

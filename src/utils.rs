@@ -1,3 +1,7 @@
+use anyhow::anyhow;
+use num_traits::Zero;
+use poseidon_rs::Fr;
+
 pub mod rarime_utils {
     use crate::RarimeError;
     use babyjubjub_rs::new_key;
@@ -15,6 +19,30 @@ pub mod rarime_utils {
     pub fn generate_aa_challenge(data: &[u8]) -> Result<Vec<u8>, RarimeError> {
         todo!();
     }
+}
+
+pub fn fr_to_32bytes(fr: &Fr) -> Result<[u8; 32], anyhow::Error> {
+    let s = fr.to_string();
+    let start = s
+        .find("0x")
+        .ok_or_else(|| anyhow!("Fr::to_string() format unexpected: no '0x'"))?;
+    let end = s
+        .rfind(')')
+        .ok_or_else(|| anyhow!("Fr::to_string() format unexpected: no ')'"))?;
+    if end <= start + 2 {
+        return Err(anyhow!("Fr::to_string() has empty hex"));
+    }
+    let hex = &s[start + 2..end];
+
+    let mut bytes = hex::decode(hex)
+        .map_err(|e| anyhow!("Failed to decode hex from Fr::to_string(): {}", e))?;
+
+    if bytes.len() > 32 {
+        bytes = bytes[bytes.len() - 32..].to_vec();
+    }
+    let mut out = [0u8; 32];
+    out[32 - bytes.len()..].copy_from_slice(&bytes);
+    Ok(out)
 }
 
 #[cfg(test)]

@@ -36,6 +36,8 @@ pub enum RarimeError {
     DerError(String),
     #[error("Unsupported type of pub key")]
     UnsupportedKey,
-    #[error("Parsing DG15 error")]
+    #[error("Parsing DG15 error: {0}")]
     ParseDg15Error(anyhow::Error),
+    #[error("Get passport key error: {0}")]
+    GetPassportKeyError(anyhow::Error),
 }
