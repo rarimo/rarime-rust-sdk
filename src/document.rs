@@ -14,9 +14,9 @@ enum ActiveAuthKey {
 }
 
 pub enum DocumentStatus {
-    NOT_REGISTRED,
-    REGISTRED_WITH_THIS_PK,
-    REGISTRED_WITH_OTHER_PK,
+    NOT_REGISTERED,
+    REGISTERED_WITH_THIS_PK,
+    REGISTERED_WITH_OTHER_PK,
 }
 
 pub struct RarimeDocument {
@@ -47,12 +47,12 @@ pub async fn get_document_status(
     let hex_profile_key = hex::encode(profile_key);
 
     if hex_active_identity == hex_zero_bytes {
-        return Ok(DocumentStatus::NOT_REGISTRED);
+        return Ok(DocumentStatus::NOT_REGISTERED);
     }
     if hex_active_identity == hex_profile_key {
-        return Ok(DocumentStatus::REGISTRED_WITH_THIS_PK);
+        return Ok(DocumentStatus::REGISTERED_WITH_THIS_PK);
     }
-    Ok(DocumentStatus::REGISTRED_WITH_OTHER_PK)
+    Ok(DocumentStatus::REGISTERED_WITH_OTHER_PK)
 }
 
 impl RarimeDocument {
@@ -130,16 +130,7 @@ impl RarimeDocument {
             ))
         })?;
 
-        let mut result_bytes = [0u8; 32];
-        let bigint_bytes = result_big_int.to_signed_bytes_be();
-        let bytes_len = bigint_bytes.len();
-
-        if bytes_len > 32 {
-            result_bytes.copy_from_slice(&bigint_bytes[bytes_len - 32..]);
-        } else {
-            let start_index = 32 - bytes_len;
-            result_bytes[start_index..].copy_from_slice(&bigint_bytes);
-        }
+        let result_bytes = big_int_to_32_bytes(&result_big_int);
 
         Ok(result_bytes)
     }
