@@ -1,0 +1,8 @@
+[package]
+name = "contracts"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+alloy = { version = "1.0.35", features = ["full"] }
+anyhow = "1.0.100"
