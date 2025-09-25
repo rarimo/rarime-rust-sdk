@@ -1,5 +1,5 @@
 use crate::RarimeError;
-use crate::utils::{big_int_to_32_bytes, big_int_to_fr};
+use crate::utils::{big_int_to_32_bytes, big_int_to_fr, unmarshal_fr};
 use anyhow::{Context, anyhow};
 use digest::Digest;
 use ff::*;
@@ -8,8 +8,7 @@ use num_traits::One;
 use sha1::Sha1;
 use sha2::{Sha224, Sha256, Sha384, Sha512};
 use simple_asn1::{ASN1Block, ASN1Class, BigUint, from_der, to_der};
-
-pub enum ActiveAuthKey {
+enum ActiveAuthKey {
     Rsa { modulus: BigInt, exponent: BigInt },
     Ecdsa { key_bytes: Vec<u8> },
 }
@@ -29,7 +28,7 @@ pub struct RarimeDocument {
 }
 
 #[derive(Debug)]
-pub enum SignatureDigestHashAlgorithm {
+enum SignatureDigestHashAlgorithm {
     SHA1,
     SHA224,
     SHA256,
@@ -122,15 +121,8 @@ impl RarimeDocument {
             RarimeError::GetPassportKeyError(anyhow::anyhow!("Poseidon hash failed: {}", e))
         })?;
 
-        let result_hex = result_fr.to_string();
-
-        let hex_str = if result_hex.starts_with("Fr(0x") && result_hex.ends_with(')') {
-            &result_hex[5..result_hex.len() - 1]
-        } else if result_hex.starts_with("0x") {
-            &result_hex[2..]
-        } else {
-            &result_hex
-        };
+        let hex_str = unmarshal_fr(result_fr)
+            .map_err(|e| anyhow::anyhow!("Failed to unmarshal Fr: {}", e))?;
 
         let result_big_int = BigInt::parse_bytes(hex_str.as_bytes(), 16).ok_or_else(|| {
             RarimeError::GetPassportKeyError(anyhow::anyhow!(
@@ -175,15 +167,8 @@ impl RarimeDocument {
             .hash(chunks_fr)
             .map_err(|e| anyhow::anyhow!("Poseidon hash failed: {}", e))?;
 
-        let hash_hex = h_fr.to_string();
-
-        let hex_str = if hash_hex.starts_with("Fr(0x") && hash_hex.ends_with(')') {
-            &hash_hex[5..hash_hex.len() - 1]
-        } else if hash_hex.starts_with("0x") {
-            &hash_hex[2..]
-        } else {
-            &hash_hex
-        };
+        let hex_str =
+            unmarshal_fr(h_fr).map_err(|e| anyhow::anyhow!("Failed to unmarshal Fr: {}", e))?;
 
         let hash_big_int = BigInt::parse_bytes(hex_str.as_bytes(), 16)
             .ok_or_else(|| anyhow::anyhow!("Failed to parse Poseidon hash result as BigInt"))?;
@@ -202,17 +187,17 @@ impl RarimeDocument {
         }
 
         let shift = bit_len - required_bits;
-        let top_bits = modulus >> shift;
+        let mut top_bits = modulus >> shift;
 
         let chunk_sizes = [224, 200, 200, 200, 200];
         let mut chunks = Vec::with_capacity(5);
-        let mut current = top_bits.clone();
 
         for &size in &chunk_sizes {
             let mask = (BigInt::one() << size) - 1;
-            let chunk = current.clone() & &mask;
+            let chunk = &top_bits & &mask;
             chunks.push(chunk);
-            current = current >> size;
+
+            top_bits = top_bits >> size;
         }
 
         chunks.reverse();
@@ -227,15 +212,8 @@ impl RarimeDocument {
             .hash(chunks_fr)
             .map_err(|e| anyhow::anyhow!("Poseidon hash failed: {}", e))?;
 
-        let hash_hex = hash_result.to_string();
-
-        let hex_str = if hash_hex.starts_with("Fr(0x") && hash_hex.ends_with(')') {
-            &hash_hex[5..hash_hex.len() - 1]
-        } else if hash_hex.starts_with("0x") {
-            &hash_hex[2..]
-        } else {
-            &hash_hex
-        };
+        let hex_str = unmarshal_fr(hash_result)
+            .map_err(|e| anyhow::anyhow!("Failed to unmarshal Fr: {}", e))?;
 
         let hash_big_int = BigInt::parse_bytes(hex_str.as_bytes(), 16)
             .ok_or_else(|| anyhow::anyhow!("Failed to parse Poseidon hash result as BigInt"))?;

@@ -2,6 +2,7 @@ use anyhow::anyhow;
 use ff::PrimeField;
 use num_bigint::BigInt;
 use num_traits::Zero;
+use poseidon_rs::Fr;
 
 pub mod rarime_utils {
     use crate::RarimeError;
@@ -51,4 +52,18 @@ pub fn big_int_to_fr(num: &BigInt) -> Result<poseidon_rs::Fr, anyhow::Error> {
         .ok_or_else(|| anyhow!("Failed convert big int to Fr"))?;
 
     Ok(fr)
+}
+
+pub fn unmarshal_fr(fr: Fr) -> Result<String, anyhow::Error> {
+    let hash_hex = fr.to_string();
+
+    let hex_str = if hash_hex.starts_with("Fr(0x") && hash_hex.ends_with(')') {
+        &hash_hex[5..hash_hex.len() - 1]
+    } else if hash_hex.starts_with("0x") {
+        &hash_hex[2..]
+    } else {
+        &hash_hex
+    };
+
+    return Ok(hex_str.to_string());
 }
