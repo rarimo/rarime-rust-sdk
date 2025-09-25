@@ -4,7 +4,6 @@ pub mod rfc;
 
 mod base64;
 mod document;
-mod flow;
 mod owned_cert;
 mod treap_tree;
 mod utils;
@@ -40,4 +39,6 @@ pub enum RarimeError {
     ParseDg15Error(anyhow::Error),
     #[error("Get passport key error: {0}")]
     GetPassportKeyError(anyhow::Error),
+    #[error("Generate private key error")]
+    GeneratePrivateKeyError,
 }

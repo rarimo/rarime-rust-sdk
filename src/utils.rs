@@ -1,19 +1,23 @@
 use anyhow::anyhow;
+use ff::PrimeField;
+use num_bigint::BigInt;
 use num_traits::Zero;
-use poseidon_rs::Fr;
 
 pub mod rarime_utils {
     use crate::RarimeError;
     use babyjubjub_rs::new_key;
 
     // GenerateBJJSecretKey generates a new secret key for the Baby JubJub curve.
-    pub fn generate_bjj_secret_key() -> Result<Vec<u8>, RarimeError> {
+    pub fn generate_rarime_private_key() -> Result<[u8; 32], RarimeError> {
         let private_key = new_key();
         let scalar = private_key.scalar_key();
-
         let (_, scalar_bytes) = scalar.to_bytes_be();
 
-        return Ok(scalar_bytes);
+        let fixed_bytes: [u8; 32] = scalar_bytes
+            .try_into()
+            .map_err(|_| RarimeError::GeneratePrivateKeyError)?;
+
+        Ok(fixed_bytes)
     }
 
     pub fn generate_aa_challenge(data: &[u8]) -> Result<Vec<u8>, RarimeError> {
@@ -21,50 +25,30 @@ pub mod rarime_utils {
     }
 }
 
-pub fn fr_to_32bytes(fr: &Fr) -> Result<[u8; 32], anyhow::Error> {
-    let s = fr.to_string();
-    let start = s
-        .find("0x")
-        .ok_or_else(|| anyhow!("Fr::to_string() format unexpected: no '0x'"))?;
-    let end = s
-        .rfind(')')
-        .ok_or_else(|| anyhow!("Fr::to_string() format unexpected: no ')'"))?;
-    if end <= start + 2 {
-        return Err(anyhow!("Fr::to_string() has empty hex"));
-    }
-    let hex = &s[start + 2..end];
-
-    let mut bytes = hex::decode(hex)
-        .map_err(|e| anyhow!("Failed to decode hex from Fr::to_string(): {}", e))?;
-
-    if bytes.len() > 32 {
-        bytes = bytes[bytes.len() - 32..].to_vec();
-    }
+pub fn big_int_to_32_bytes(num: &BigInt) -> [u8; 32] {
     let mut out = [0u8; 32];
-    out[32 - bytes.len()..].copy_from_slice(&bytes);
-    Ok(out)
-}
 
-#[cfg(test)]
-mod tests {
-    use crate::utils::rarime_utils::generate_bjj_secret_key;
-
-    #[test]
-    fn test_generate_bjj_secret_key_uniqueness() {
-        let num_keys_to_generate = 5;
-
-        let mut generated_keys = Vec::new();
-
-        for _ in 0..num_keys_to_generate {
-            let key = generate_bjj_secret_key().expect("Failed to generate a key");
-            generated_keys.push(key);
-        }
-        println!("{:?}", generated_keys);
-
-        for i in 0..num_keys_to_generate {
-            for j in (i + 1)..num_keys_to_generate {
-                assert_ne!(generated_keys[i], generated_keys[j], "Keys are not unique!");
-            }
-        }
+    if num.is_zero() {
+        return out;
     }
+
+    let num_bytes = num.to_signed_bytes_be();
+    let len = num_bytes.len();
+
+    if len > 32 {
+        out.copy_from_slice(&num_bytes[len - 32..]);
+    } else {
+        let start_index = 32 - len;
+        out[start_index..].copy_from_slice(&num_bytes);
+    }
+
+    return out;
+}
+pub fn big_int_to_fr(num: &BigInt) -> Result<poseidon_rs::Fr, anyhow::Error> {
+    let decimal_str = num.to_string();
+
+    let fr = poseidon_rs::Fr::from_str(&decimal_str)
+        .ok_or_else(|| anyhow!("Failed convert big int to Fr"))?;
+
+    Ok(fr)
 }

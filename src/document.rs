@@ -1,10 +1,10 @@
-use crate::{RarimeError, utils};
+use crate::RarimeError;
+use crate::utils::{big_int_to_32_bytes, big_int_to_fr};
 use anyhow::{Context, anyhow};
 use digest::Digest;
 use ff::*;
 use num_bigint::BigInt;
-use num_traits::{One, Zero};
-use poseidon_rs::{Fr, Poseidon};
+use num_traits::One;
 use sha1::Sha1;
 use sha2::{Sha224, Sha256, Sha384, Sha512};
 use simple_asn1::{ASN1Block, ASN1Class, BigUint, from_der, to_der};
@@ -12,6 +12,12 @@ use simple_asn1::{ASN1Block, ASN1Class, BigUint, from_der, to_der};
 pub enum ActiveAuthKey {
     Rsa { modulus: BigInt, exponent: BigInt },
     Ecdsa { key_bytes: Vec<u8> },
+}
+
+pub enum DocumentStatus {
+    NOT_REGISTRED,
+    REGISTRED_WITH_THIS_PK,
+    REGISTRED_WITH_OTHER_PK,
 }
 
 pub struct RarimeDocument {
@@ -22,33 +28,69 @@ pub struct RarimeDocument {
     pub(crate) sod: Vec<u8>,
 }
 
+#[derive(Debug)]
+pub enum SignatureDigestHashAlgorithm {
+    SHA1,
+    SHA224,
+    SHA256,
+    SHA384,
+    SHA512,
+}
+
+pub async fn get_document_status(
+    passport_key: [u8; 32],
+    profile_key: [u8; 32],
+) -> Result<DocumentStatus, anyhow::Error> {
+    let passport_info = contracts::get_passport_info(passport_key).await?;
+    let zero_bytes: [u8; 32] = [0; 32];
+    let hex_zero_bytes = hex::encode(&zero_bytes);
+    let hex_active_identity = hex::encode(passport_info.passportInfo_.activeIdentity);
+    let hex_profile_key = hex::encode(profile_key);
+
+    if hex_active_identity == hex_zero_bytes {
+        return Ok(DocumentStatus::NOT_REGISTRED);
+    }
+    if hex_active_identity == hex_profile_key {
+        return Ok(DocumentStatus::REGISTRED_WITH_THIS_PK);
+    }
+    Ok(DocumentStatus::REGISTRED_WITH_OTHER_PK)
+}
+
 impl RarimeDocument {
     pub fn get_passport_key(&self) -> Result<[u8; 32], RarimeError> {
         if let Some(dg15_bytes) = &self.data_group15 {
             let key = Self::parse_dg15_pubkey(dg15_bytes).map_err(RarimeError::ParseDg15Error)?;
-            match key {
+            return match key {
                 ActiveAuthKey::Ecdsa { key_bytes } => {
-                    return RarimeDocument::extract_ecdsa_passport_key(&key_bytes)
-                        .map_err(RarimeError::GetPassportKeyError);
+                    RarimeDocument::extract_ecdsa_passport_key(&key_bytes)
+                        .map_err(RarimeError::GetPassportKeyError)
                 }
                 ActiveAuthKey::Rsa { modulus, exponent } => {
-                    return RarimeDocument::extract_rsa_passport_key(&modulus, &exponent)
-                        .map_err(RarimeError::GetPassportKeyError);
+                    RarimeDocument::extract_rsa_passport_key(&modulus, &exponent)
+                        .map_err(RarimeError::GetPassportKeyError)
                 }
-            }
+            };
         }
 
-        let sign_attr = Self::extract_authenticated_attributes(&self.sod)
+        let passport_key = Self::get_passport_hash(&self.sod)
             .map_err(|e| RarimeError::GetPassportKeyError(e.into()))?;
 
-        let hash_algorithm = extract_hash_algorithm(&self.sod)
+        Ok(passport_key)
+    }
+
+    fn get_passport_hash(sod: &[u8]) -> Result<[u8; 32], anyhow::Error> {
+        let sign_attr: ASN1Block = Self::extract_signed_attributes(&sod)
             .map_err(|e| RarimeError::GetPassportKeyError(e.into()))?;
 
-        let parsed_hash_algorithm = parse_hash_algorithm(&hash_algorithm)
+        let hash_algorithm = RarimeDocument::extract_hash_algorithm(&sod)
             .map_err(|e| RarimeError::GetPassportKeyError(e.into()))?;
 
-        let sign_attr_bytes =
+        let parsed_hash_algorithm = RarimeDocument::parse_hash_algorithm(&hash_algorithm)
+            .map_err(|e| RarimeError::GetPassportKeyError(e.into()))?;
+
+        let mut sign_attr_bytes =
             to_der(&sign_attr).map_err(|e| RarimeError::GetPassportKeyError(e.into()))?;
+        sign_attr_bytes[0] = 0x31;
 
         let hash_bytes = match parsed_hash_algorithm {
             SignatureDigestHashAlgorithm::SHA1 => Sha1::digest(&sign_attr_bytes).to_vec(),
@@ -57,84 +99,154 @@ impl RarimeDocument {
             SignatureDigestHashAlgorithm::SHA384 => Sha384::digest(&sign_attr_bytes).to_vec(),
             SignatureDigestHashAlgorithm::SHA512 => Sha512::digest(&sign_attr_bytes).to_vec(),
         };
-
-        let mut hash = [0u8; 32];
+        let mut padded_hash = [0u8; 32];
         let len = std::cmp::min(hash_bytes.len(), 32);
-        hash[..len].copy_from_slice(&hash_bytes[..len]);
+        padded_hash[..len].copy_from_slice(&hash_bytes[..len]);
 
-        Ok(hash)
+        let hash_int = BigInt::from_bytes_be(num_bigint::Sign::Plus, &padded_hash);
+
+        let binary_string = hash_int.to_str_radix(2);
+        let padded_binary_string = format!("{:0>256}", binary_string);
+        let processed = &padded_binary_string[..252]
+            .chars()
+            .rev()
+            .collect::<String>();
+        let out = BigInt::parse_bytes(processed.as_bytes(), 2).expect("Invalid binary string");
+
+        let decimal_str = out.to_string();
+        let hash_fr = poseidon_rs::Fr::from_str(&decimal_str)
+            .ok_or(anyhow::anyhow!("Failed to convert BigInt to Fr"))?;
+
+        let poseidon = poseidon_rs::Poseidon::new();
+        let result_fr = poseidon.hash(vec![hash_fr]).map_err(|e| {
+            RarimeError::GetPassportKeyError(anyhow::anyhow!("Poseidon hash failed: {}", e))
+        })?;
+
+        let result_hex = result_fr.to_string();
+
+        let hex_str = if result_hex.starts_with("Fr(0x") && result_hex.ends_with(')') {
+            &result_hex[5..result_hex.len() - 1]
+        } else if result_hex.starts_with("0x") {
+            &result_hex[2..]
+        } else {
+            &result_hex
+        };
+
+        let result_big_int = BigInt::parse_bytes(hex_str.as_bytes(), 16).ok_or_else(|| {
+            RarimeError::GetPassportKeyError(anyhow::anyhow!(
+                "Failed to parse Poseidon hash result"
+            ))
+        })?;
+
+        let mut result_bytes = [0u8; 32];
+        let bigint_bytes = result_big_int.to_signed_bytes_be();
+        let bytes_len = bigint_bytes.len();
+
+        if bytes_len > 32 {
+            result_bytes.copy_from_slice(&bigint_bytes[bytes_len - 32..]);
+        } else {
+            let start_index = 32 - bytes_len;
+            result_bytes[start_index..].copy_from_slice(&bigint_bytes);
+        }
+
+        Ok(result_bytes)
     }
 
     fn extract_ecdsa_passport_key(key_bytes: &[u8]) -> Result<[u8; 32], anyhow::Error> {
-        let x = BigInt::from_bytes_be(num_bigint::Sign::Plus, &key_bytes[..32]);
-        let y = BigInt::from_bytes_be(num_bigint::Sign::Plus, &key_bytes[33..]);
+        if key_bytes.len() != 65 || key_bytes[0] != 0x04 {
+            return Err(anyhow::anyhow!("Invalid ECDSA key format"));
+        }
+
+        let x = BigInt::from_bytes_be(num_bigint::Sign::Plus, &key_bytes[1..33]);
+        let y = BigInt::from_bytes_be(num_bigint::Sign::Plus, &key_bytes[33..65]);
 
         // 2^248
         let modulus = BigInt::one() << 248;
 
-        let x_mod: BigInt = x % &modulus;
-        let y_mod: BigInt = y % &modulus;
+        let x_mod = &x % &modulus;
+        let y_mod = &y % &modulus;
 
         let mut chunks_fr = Vec::with_capacity(2);
-        for ch in &[x_mod, y_mod] {
-            let bu = ch
-                .to_biguint()
-                .ok_or_else(|| anyhow::anyhow!("Negative coordinate?"))?;
-            let dec = bu.to_str_radix(10);
-            let fe = Fr::from_str(&dec)
-                .ok_or_else(|| anyhow::anyhow!("Failed to convert chunk -> Fr: {}", dec))?;
-            chunks_fr.push(fe);
-        }
+        chunks_fr.push(big_int_to_fr(&x_mod)?);
+        chunks_fr.push(big_int_to_fr(&y_mod)?);
 
-        // Poseidon hash
-        let hasher = Poseidon::new();
+        let hasher = poseidon_rs::Poseidon::new();
         let h_fr = hasher
             .hash(chunks_fr)
             .map_err(|e| anyhow::anyhow!("Poseidon hash failed: {}", e))?;
 
-        // Fr -> [u8; 32]
-        let key_bytes = utils::fr_to_32bytes(&h_fr)?;
-        Ok(key_bytes)
+        let hash_hex = h_fr.to_string();
+
+        let hex_str = if hash_hex.starts_with("Fr(0x") && hash_hex.ends_with(')') {
+            &hash_hex[5..hash_hex.len() - 1]
+        } else if hash_hex.starts_with("0x") {
+            &hash_hex[2..]
+        } else {
+            &hash_hex
+        };
+
+        let hash_big_int = BigInt::parse_bytes(hex_str.as_bytes(), 16)
+            .ok_or_else(|| anyhow::anyhow!("Failed to parse Poseidon hash result as BigInt"))?;
+
+        Ok(big_int_to_32_bytes(&hash_big_int))
     }
-    fn extract_rsa_passport_key(
-        modulus: &BigInt,
-        _exponent: &BigInt,
-    ) -> Result<[u8; 32], anyhow::Error> {
-        let required_bits = 200 * 4 + 224;
-        let bit_len = modulus.bits();
+
+    fn extract_rsa_passport_key(modulus: &BigInt, _exponent: &BigInt) -> anyhow::Result<[u8; 32]> {
+        let bit_len = modulus.bits() as usize;
+        let required_bits = 200 * 4 + 224; // 1024
+
         if bit_len < required_bits {
-            return Err(anyhow!("RSA modulus too small to extract required bits"));
+            return Err(anyhow::anyhow!(
+                "RSA modulus too small to extract required bits"
+            ));
         }
 
         let shift = bit_len - required_bits;
         let top_bits = modulus >> shift;
 
-        let chunk_sizes = [200, 200, 200, 200, 224];
-        let mut chunks_bigint: Vec<BigInt> = vec![BigInt::zero(); chunk_sizes.len()];
+        let chunk_sizes = [224, 200, 200, 200, 200];
+        let mut chunks = Vec::with_capacity(5);
         let mut current = top_bits.clone();
-        for (i, &size) in chunk_sizes.iter().enumerate() {
-            let mask = (BigInt::one() << size) - BigInt::one();
-            let chunk = &current & &mask;
-            chunks_bigint[chunk_sizes.len() - 1 - i] = chunk;
-            current >>= size;
+
+        for &size in &chunk_sizes {
+            let mask = (BigInt::one() << size) - 1;
+            let chunk = current.clone() & &mask;
+            chunks.push(chunk);
+            current = current >> size;
         }
 
-        let mut chunks_fr: Vec<Fr> = Vec::with_capacity(chunks_bigint.len());
-        for ch in chunks_bigint.iter() {
-            let bu = ch.to_biguint().ok_or_else(|| anyhow!("chunk negative?"))?;
-            let dec = bu.to_str_radix(10);
-            let fe = Fr::from_str(&dec)
-                .ok_or_else(|| anyhow!("Failed to convert chunk -> Fr: {}", dec))?;
-            chunks_fr.push(fe);
+        chunks.reverse();
+
+        fn big_int_to_fr(num: &BigInt) -> anyhow::Result<poseidon_rs::Fr> {
+            let decimal_str = num.to_string();
+            poseidon_rs::Fr::from_str(&decimal_str)
+                .ok_or(anyhow::anyhow!("Failed to convert BigInt to Fr"))
         }
 
-        let hasher = Poseidon::new();
-        let h_fr = hasher
+        let mut chunks_fr = Vec::new();
+        for chunk in chunks {
+            chunks_fr.push(big_int_to_fr(&chunk)?);
+        }
+
+        let poseidon = poseidon_rs::Poseidon::new();
+        let hash_result = poseidon
             .hash(chunks_fr)
-            .map_err(|e| anyhow!("Poseidon hash failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Poseidon hash failed: {}", e))?;
 
-        let out = utils::fr_to_32bytes(&h_fr)?;
-        Ok(out)
+        let hash_hex = hash_result.to_string();
+
+        let hex_str = if hash_hex.starts_with("Fr(0x") && hash_hex.ends_with(')') {
+            &hash_hex[5..hash_hex.len() - 1]
+        } else if hash_hex.starts_with("0x") {
+            &hash_hex[2..]
+        } else {
+            &hash_hex
+        };
+
+        let hash_big_int = BigInt::parse_bytes(hex_str.as_bytes(), 16)
+            .ok_or_else(|| anyhow::anyhow!("Failed to parse Poseidon hash result as BigInt"))?;
+
+        Ok(big_int_to_32_bytes(&hash_big_int))
     }
 
     fn parse_dg15_pubkey(dg15_bytes: &[u8]) -> Result<ActiveAuthKey, anyhow::Error> {
@@ -179,7 +291,103 @@ impl RarimeDocument {
         })
     }
 
-    fn extract_authenticated_attributes(sod_bytes: &[u8]) -> anyhow::Result<ASN1Block> {
+    fn extract_signed_attributes(sod_bytes: &[u8]) -> Result<ASN1Block, anyhow::Error> {
+        let blocks = from_der(sod_bytes).context("Failed to parse DER")?;
+        let root = blocks.get(0).context("Empty DER")?;
+
+        let app23_seq = match root {
+            ASN1Block::Explicit(class, _, tag, content)
+                if *class == ASN1Class::Application && *tag == BigUint::from(23u32) =>
+            {
+                match content.as_ref() {
+                    ASN1Block::Sequence(_, inner) => inner.clone(),
+                    other => {
+                        return Err(anyhow!(
+                            "Expected SEQUENCE inside Application 23, got {:?}",
+                            other
+                        ));
+                    }
+                }
+            }
+            other => return Err(anyhow!("Expected Application 23 at root, got {:?}", other)),
+        };
+
+        let tagged0_inner_blocks: Vec<ASN1Block> = {
+            let found = app23_seq
+                .iter()
+                .find(|b| match b {
+                    ASN1Block::Explicit(_, _, tag, _) if *tag == BigUint::from(0u32) => true,
+                    ASN1Block::Unknown(_, _, _, tag, _) => format!("{:?}", tag) == "0",
+                    _ => false,
+                })
+                .context("No [0] tagged block found in Application 23 SEQUENCE")?;
+
+            match found {
+                ASN1Block::Explicit(_, _, _, content) => match content.as_ref() {
+                    ASN1Block::Sequence(_, v) => v.clone(),
+                    ASN1Block::Set(_, v) => v.clone(),
+                    other => vec![other.clone()],
+                },
+                ASN1Block::Unknown(_, _, _, tag, raw_bytes) => {
+                    let inner = from_der(&raw_bytes).context(format!(
+                        "Failed to parse inner raw bytes from Unknown(ContextSpecific tag={:?})",
+                        tag
+                    ))?;
+                    inner
+                }
+                other => match other {
+                    ASN1Block::Sequence(_, v) => v.clone(),
+                    ASN1Block::Set(_, v) => v.clone(),
+                    _ => vec![other.clone()],
+                },
+            }
+        };
+
+        let final_seq: Vec<ASN1Block> = tagged0_inner_blocks
+            .iter()
+            .find_map(|b| {
+                if let ASN1Block::Set(_, content) = b {
+                    if let Some(ASN1Block::Sequence(_, inner)) = content.get(0) {
+                        if inner.len() == 6 {
+                            return Some(inner.clone());
+                        }
+                    }
+                }
+                None
+            })
+            .context("No inner SET containing 6-element SEQUENCE found")?;
+
+        let signed_attrs_block = final_seq
+            .iter()
+            .find_map(|elem| {
+                if let ASN1Block::Explicit(_, _, tag, content) = elem {
+                    if *tag == BigUint::from(0u32) {
+                        return Some(match content.as_ref() {
+                            ASN1Block::Set(_, v) => ASN1Block::Set(v.len(), v.clone()),
+                            ASN1Block::Sequence(_, v) => ASN1Block::Sequence(v.len(), v.clone()),
+                            other => other.clone(),
+                        });
+                    }
+                }
+                if let ASN1Block::Unknown(_, _, _, tag, raw_bytes) = elem {
+                    if format!("{:?}", tag) == "0" {
+                        if let Ok(parsed) = from_der(&raw_bytes) {
+                            if parsed.len() == 1 {
+                                return Some(parsed.into_iter().next().unwrap());
+                            } else {
+                                return Some(ASN1Block::Sequence(parsed.len(), parsed));
+                            }
+                        }
+                    }
+                }
+
+                None
+            })
+            .context("No [0] tag found inside final SEQUENCE")?;
+        Ok(signed_attrs_block)
+    }
+
+    fn extract_hash_algorithm(sod_bytes: &[u8]) -> anyhow::Result<ASN1Block> {
         let blocks = from_der(sod_bytes).context("Failed to parse DER")?;
 
         let app23_seq = match &blocks[0] {
@@ -211,13 +419,13 @@ impl RarimeDocument {
             _ => anyhow::bail!("Expected SEQUENCE inside [0]"),
         };
 
-        let final_block = inner_seq
+        let sequence_block = inner_seq
             .iter()
             .find_map(|b| {
                 if let ASN1Block::Set(_, content) = b {
                     if let Some(ASN1Block::Sequence(_, inner)) = content.get(0) {
                         if inner.len() == 6 {
-                            return Some(ASN1Block::Sequence(inner.len(), inner.clone()));
+                            return Some(inner.clone());
                         }
                     }
                 }
@@ -225,113 +433,50 @@ impl RarimeDocument {
             })
             .context("No inner SET containing 6-element SEQUENCE found")?;
 
-        Ok(final_block)
-    }
-}
-
-#[derive(Debug)]
-enum SignatureDigestHashAlgorithm {
-    SHA1,
-    SHA224,
-    SHA256,
-    SHA384,
-    SHA512,
-}
-fn extract_hash_algorithm(sod_bytes: &[u8]) -> anyhow::Result<ASN1Block> {
-    let blocks = from_der(sod_bytes).context("Failed to parse DER")?;
-
-    let app23_seq = match &blocks[0] {
-        ASN1Block::Explicit(class, _, tag, content)
-            if *class == ASN1Class::Application && *tag == BigUint::from(23u32) =>
-        {
-            match content.as_ref() {
-                ASN1Block::Sequence(_, inner) => inner,
-                _ => anyhow::bail!("Expected SEQUENCE inside Application 23"),
-            }
-        }
-        _ => anyhow::bail!("Expected Application 23"),
-    };
-
-    let tagged0 = app23_seq
-        .iter()
-        .find_map(|b| {
-            if let ASN1Block::Explicit(_, _, tag, content) = b {
-                if *tag == BigUint::from(0u32) {
-                    return Some(content.as_ref());
-                }
-            }
-            None
-        })
-        .context("No [0] tagged block found in Application 23 SEQUENCE")?;
-
-    let inner_seq = match tagged0 {
-        ASN1Block::Sequence(_, inner) => inner,
-        _ => anyhow::bail!("Expected SEQUENCE inside [0]"),
-    };
-
-    let sequence_block = inner_seq
-        .iter()
-        .find_map(|b| {
-            if let ASN1Block::Set(_, content) = b {
-                if let Some(ASN1Block::Sequence(_, inner)) = content.get(0) {
-                    if inner.len() == 6 {
-                        return Some(inner.clone());
-                    }
-                }
-            }
-            None
-        })
-        .context("No inner SET containing 6-element SEQUENCE found")?;
-
-    let sig_alg_block = sequence_block
-        .iter()
-        .find_map(|b| {
-            if let ASN1Block::Sequence(_, inner) = b {
-                if inner.len() == 2 {
-                    if let ASN1Block::ObjectIdentifier(tag, oid) = &inner[0] {
-                        let oid_string = oid
-                            .as_vec::<&BigUint>()
-                            .unwrap()
-                            .iter()
-                            .map(|n| n.to_string())
-                            .collect::<Vec<_>>()
-                            .join(".");
-                        if (oid_string.starts_with("1.2.840.113549.1.1")) {
-                            return Some(ASN1Block::ObjectIdentifier(*tag, oid.clone()));
+        let sig_alg_block = sequence_block
+            .iter()
+            .find_map(|b| {
+                if let ASN1Block::Sequence(_, inner) = b {
+                    if inner.len() == 2 {
+                        if let ASN1Block::ObjectIdentifier(tag, oid) = &inner[0] {
+                            let oid_string = oid
+                                .as_vec::<&BigUint>()
+                                .unwrap()
+                                .iter()
+                                .map(|n| n.to_string())
+                                .collect::<Vec<_>>()
+                                .join(".");
+                            if (oid_string.starts_with("1.2.840.113549.1.1")) {
+                                return Some(ASN1Block::ObjectIdentifier(*tag, oid.clone()));
+                            }
                         }
                     }
                 }
-            }
-            None
-        })
-        .context("No RSA+SHA signature algorithm OID found")?;
+                None
+            })
+            .context("No RSA+SHA signature algorithm OID found")?;
 
-    Ok(sig_alg_block)
-}
-fn parse_hash_algorithm(oid: &ASN1Block) -> anyhow::Result<SignatureDigestHashAlgorithm> {
-    let oid_string = if let ASN1Block::ObjectIdentifier(_, oid) = oid {
-        oid.as_vec::<&BigUint>()
-            .unwrap()
-            .iter()
-            .map(|n| n.to_string())
-            .collect::<Vec<_>>()
-            .join(".")
-    } else {
-        anyhow::bail!("Not an ObjectIdentifier");
-    };
-
-    match oid_string.as_str() {
-        "1.2.840.113549.1.1.5" => Ok(SignatureDigestHashAlgorithm::SHA1),
-        "1.2.840.113549.1.1.14" => Ok(SignatureDigestHashAlgorithm::SHA224),
-        "1.2.840.113549.1.1.11" => Ok(SignatureDigestHashAlgorithm::SHA256),
-        "1.2.840.113549.1.1.12" => Ok(SignatureDigestHashAlgorithm::SHA384),
-        "1.2.840.113549.1.1.13" => Ok(SignatureDigestHashAlgorithm::SHA512),
-        _ => anyhow::bail!("Unknown or unsupported RSA+SHA OID: {}", oid_string),
+        Ok(sig_alg_block)
     }
-}
+    fn parse_hash_algorithm(oid: &ASN1Block) -> anyhow::Result<SignatureDigestHashAlgorithm> {
+        let oid_string = if let ASN1Block::ObjectIdentifier(_, oid) = oid {
+            oid.as_vec::<&BigUint>()
+                .unwrap()
+                .iter()
+                .map(|n| n.to_string())
+                .collect::<Vec<_>>()
+                .join(".")
+        } else {
+            anyhow::bail!("Not an ObjectIdentifier");
+        };
 
-pub enum DocumentStatus {
-    REGISTRED_WITH_THIS_PK,
-    REGISTRED_WITH_OTHER_PK,
-    NOT_REGISTRED,
+        match oid_string.as_str() {
+            "1.2.840.113549.1.1.5" => Ok(SignatureDigestHashAlgorithm::SHA1),
+            "1.2.840.113549.1.1.14" => Ok(SignatureDigestHashAlgorithm::SHA224),
+            "1.2.840.113549.1.1.11" => Ok(SignatureDigestHashAlgorithm::SHA256),
+            "1.2.840.113549.1.1.12" => Ok(SignatureDigestHashAlgorithm::SHA384),
+            "1.2.840.113549.1.1.13" => Ok(SignatureDigestHashAlgorithm::SHA512),
+            _ => anyhow::bail!("Unknown or unsupported RSA+SHA OID: {}", oid_string),
+        }
+    }
 }
