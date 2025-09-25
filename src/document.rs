@@ -217,12 +217,6 @@ impl RarimeDocument {
 
         chunks.reverse();
 
-        fn big_int_to_fr(num: &BigInt) -> anyhow::Result<poseidon_rs::Fr> {
-            let decimal_str = num.to_string();
-            poseidon_rs::Fr::from_str(&decimal_str)
-                .ok_or(anyhow::anyhow!("Failed to convert BigInt to Fr"))
-        }
-
         let mut chunks_fr = Vec::new();
         for chunk in chunks {
             chunks_fr.push(big_int_to_fr(&chunk)?);
