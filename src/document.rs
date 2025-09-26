@@ -42,7 +42,7 @@ pub async fn get_document_status(
     profile_key: [u8; 32],
 ) -> Result<DocumentStatus, anyhow::Error> {
     let passport_info = contracts::get_passport_info(passport_key).await?;
-    let zero_bytes: [u8; 32] = [0; 32];
+    let zero_bytes = [0u8; 32];
     let hex_zero_bytes = hex::encode(&zero_bytes);
     let hex_active_identity = hex::encode(passport_info.passportInfo_.activeIdentity);
     let hex_profile_key = hex::encode(profile_key);
@@ -122,7 +122,7 @@ impl RarimeDocument {
             .collect::<String>();
         let out = BigInt::parse_bytes(processed.as_bytes(), 2).expect("Invalid binary string");
 
-        let poseidon_hash = poseidon_hash_32_bytes(vec![out])
+        let poseidon_hash = poseidon_hash_32_bytes(&vec![out])
             .map_err(|e| anyhow::anyhow!("Poseidon hash failed: {}", e))?;
 
         Ok(poseidon_hash)
@@ -142,7 +142,7 @@ impl RarimeDocument {
         let x_mod = &x % &modulus;
         let y_mod = &y % &modulus;
 
-        let poseidon_hash = poseidon_hash_32_bytes(vec![x_mod, y_mod])
+        let poseidon_hash = poseidon_hash_32_bytes(&vec![x_mod, y_mod])
             .map_err(|e| anyhow::anyhow!("Poseidon hash failed: {}", e))?;
 
         Ok(poseidon_hash)
@@ -174,7 +174,7 @@ impl RarimeDocument {
 
         chunks.reverse();
 
-        let poseidon_result = poseidon_hash_32_bytes(chunks)
+        let poseidon_result = poseidon_hash_32_bytes(&chunks)
             .map_err(|e| anyhow::anyhow!("Poseidon hash failed: {}", e))?;
 
         Ok(poseidon_result)

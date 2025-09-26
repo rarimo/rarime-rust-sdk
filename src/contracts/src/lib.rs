@@ -1,6 +1,8 @@
 mod state_keeper;
 
+use alloy::hex::FromHexError;
 use alloy::sol;
+use thiserror::Error;
 #[cfg(debug_assertions)]
 pub(crate) const RPC_URL: &str = "https://rpc.evm.mainnet.rarimo.com";
 #[cfg(debug_assertions)]
@@ -18,3 +20,14 @@ sol!(
     "src/abi/StateKeeper.json"
 );
 pub use state_keeper::get_passport_info;
+#[derive(Debug, Error)]
+pub enum ContractsError {
+    #[error("Failed to parse the RPC URL: {0}")]
+    UrlParseError(#[from] url::ParseError),
+
+    #[error("Failed to parse the contract address: {0}")]
+    AddressParseError(#[from] FromHexError),
+
+    #[error("Contract call failed: {0}")]
+    ContractCallError(#[from] alloy::contract::Error),
+}

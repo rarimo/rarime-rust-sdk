@@ -1,8 +1,8 @@
-use anyhow::anyhow;
-use ff::PrimeField;
+use ff::{PrimeField, PrimeFieldRepr};
 use num_bigint::BigInt;
 use num_traits::Zero;
-use poseidon_rs::Fr;
+use poseidon_rs::{Fr, FrRepr};
+use std::io::Cursor;
 
 pub mod rarime_utils {
     use crate::RarimeError;
@@ -42,48 +42,39 @@ pub fn big_int_to_32_bytes(num: &BigInt) -> [u8; 32] {
         let start_index = 32 - len;
         out[start_index..].copy_from_slice(&num_bytes);
     }
-
     return out;
 }
-fn big_int_to_fr(num: &BigInt) -> Result<poseidon_rs::Fr, anyhow::Error> {
-    let decimal_str = num.to_string();
 
-    let fr = poseidon_rs::Fr::from_str(&decimal_str)
-        .ok_or_else(|| anyhow!("Failed convert big int to Fr"))?;
-
-    Ok(fr)
-}
-
-pub fn unmarshal_fr(fr: Fr) -> Result<String, anyhow::Error> {
-    let hash_hex = fr.to_string();
-
-    let hex_str = if hash_hex.starts_with("Fr(0x") && hash_hex.ends_with(')') {
-        &hash_hex[5..hash_hex.len() - 1]
-    } else if hash_hex.starts_with("0x") {
-        &hash_hex[2..]
-    } else {
-        &hash_hex
-    };
-
-    return Ok(hex_str.to_string());
-}
-
-pub fn poseidon_hash_32_bytes(vec_big_int: Vec<BigInt>) -> Result<[u8; 32], anyhow::Error> {
+pub fn poseidon_hash_32_bytes(vec_big_int: &[BigInt]) -> Result<[u8; 32], anyhow::Error> {
     let poseidon = poseidon_rs::Poseidon::new();
     let vec_fr: Vec<Fr> = vec_big_int
         .into_iter()
-        .map(|x| big_int_to_fr(&x).unwrap())
+        .map(|big_int| {
+            let (sign, bytes) = big_int.to_bytes_be();
+
+            let mut repr = FrRepr::default();
+
+            let mut cursor = Cursor::new(&bytes);
+            repr.read_be(&mut cursor)
+                .expect("error convert BigInt to Fr ");
+
+            Fr::from_repr(repr).expect("error converting Repr to Fr")
+        })
         .collect();
-    let hash_result = poseidon
+    let hash_result: Fr = poseidon
         .hash(vec_fr)
         .map_err(|e| anyhow::anyhow!("Poseidon hash failed: {}", e))?;
 
-    let hex_str =
-        unmarshal_fr(hash_result).map_err(|e| anyhow::anyhow!("Failed to unmarshal Fr: {}", e))?;
+    let repr = hash_result.into_repr();
 
-    let hash_big_int = BigInt::parse_bytes(hex_str.as_bytes(), 16)
-        .ok_or_else(|| anyhow::anyhow!("Failed to parse Poseidon hash result as BigInt"))?;
-    let big_int_32 = big_int_to_32_bytes(&hash_big_int);
+    let mut raw_hash_bytes = Vec::new();
+
+    repr.write_be(&mut raw_hash_bytes)
+        .expect("Error converting repr to bytes");
+
+    let result_big_int = BigInt::from_bytes_be(num_bigint::Sign::Plus, &raw_hash_bytes);
+
+    let big_int_32 = big_int_to_32_bytes(&result_big_int);
 
     return Ok(big_int_32);
 }

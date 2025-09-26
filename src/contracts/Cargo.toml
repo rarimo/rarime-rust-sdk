@@ -5,4 +5,5 @@ edition = "2024"
 
 [dependencies]
 alloy = { version = "1.0.35", features = ["full"] }
-anyhow = "1.0.100"
+thiserror = "2.0.16"
+url = "2.5.7"
