@@ -87,12 +87,16 @@ impl RarimeDocument {
 
         let mut sign_attr_bytes = to_der(&sign_attr)?;
 
-        // The first byte must be 0x31, which is the BER/DER tag for an **EXPLICIT**
-        // Context-Specific element with tag number [0] (Class: Context-Specific, Tag: 0, Form: Constructed).
+        // The incoming data is wrapped with the EXPLICIT Context-Specific tag [0] (0xA0),
+        // typically used in the CMS ContentInfo structure (RFC 5652).
         //
-        // This explicit tagging wraps the content, and the conversion (decoding/encoding)
-        // is necessary to correctly process the inner structure (e.g., for hash/signature calculation,
-        // as implied by the CMS standard, RFC 5652, Section 5.4).
+        // **CRITICAL HASHING STEP:**
+        // Per the CMS standard's requirements for calculating the signature/hash of
+        // **SignedAttributes**, the external EXPLICIT tag (0xA0) must be discarded.
+        // Instead, the first byte of the data *used for hashing* must be the DER tag
+        // for the **SignedAttributes** structure itself, which is **SET OF** (0x31).
+        //
+        // This replacement is mandatory for correct hash calculation.
         //
         // Ref: RFC 5652 (CMS) section 5.4, detailing the structure's ASN.1 definition.
         sign_attr_bytes[0] = 0x31;
