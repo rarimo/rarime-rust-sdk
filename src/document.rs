@@ -1,5 +1,5 @@
 use crate::RarimeError;
-use crate::utils::{big_int_to_32_bytes, big_int_to_fr, poseidon_hash};
+use crate::utils::poseidon_hash_32_bytes;
 use anyhow::{Context, anyhow};
 use digest::Digest;
 use ff::*;
@@ -86,6 +86,15 @@ impl RarimeDocument {
         let parsed_hash_algorithm = RarimeDocument::parse_hash_algorithm(&hash_algorithm)?;
 
         let mut sign_attr_bytes = to_der(&sign_attr)?;
+
+        // The first byte must be 0xA0, which is the BER/DER tag for an **EXPLICIT**
+        //Context-Specific element with tag number [0] (Class: Context-Specific, Tag: 0, Form: Constructed).
+        //
+        // This explicit tagging wraps the content, and the conversion (decoding/encoding)
+        // is necessary to correctly process the inner structure (e.g., for hash/signature calculation,
+        // as implied by the CMS standard, RFC 5652, Section 5.4).
+        //
+        // Ref: RFC 5652 (CMS) section 5.4, detailing the structure's ASN.1 definition.
         sign_attr_bytes[0] = 0x31;
 
         let hash_bytes = match parsed_hash_algorithm {
@@ -109,14 +118,10 @@ impl RarimeDocument {
             .collect::<String>();
         let out = BigInt::parse_bytes(processed.as_bytes(), 2).expect("Invalid binary string");
 
-        let decimal_str = out.to_string();
-        let hash_fr = poseidon_rs::Fr::from_str(&decimal_str)
-            .ok_or(anyhow::anyhow!("Failed to convert BigInt to Fr"))?;
-
-        let poseidon_hash = poseidon_hash(vec![hash_fr])
+        let poseidon_hash = poseidon_hash_32_bytes(vec![out])
             .map_err(|e| anyhow::anyhow!("Poseidon hash failed: {}", e))?;
 
-        Ok(big_int_to_32_bytes(&poseidon_hash))
+        Ok(poseidon_hash)
     }
 
     fn extract_ecdsa_passport_key(key_bytes: &[u8]) -> Result<[u8; 32], anyhow::Error> {
@@ -133,14 +138,10 @@ impl RarimeDocument {
         let x_mod = &x % &modulus;
         let y_mod = &y % &modulus;
 
-        let mut chunks_fr = Vec::with_capacity(2);
-        chunks_fr.push(big_int_to_fr(&x_mod)?);
-        chunks_fr.push(big_int_to_fr(&y_mod)?);
+        let poseidon_hash = poseidon_hash_32_bytes(vec![x_mod, y_mod])
+            .map_err(|e| anyhow::anyhow!("Poseidon hash failed: {}", e))?;
 
-        let poseidon_hash =
-            poseidon_hash(chunks_fr).map_err(|e| anyhow::anyhow!("Poseidon hash failed: {}", e))?;
-
-        Ok(big_int_to_32_bytes(&poseidon_hash))
+        Ok(poseidon_hash)
     }
 
     fn extract_rsa_passport_key(modulus: &BigInt, _exponent: &BigInt) -> anyhow::Result<[u8; 32]> {
@@ -169,15 +170,10 @@ impl RarimeDocument {
 
         chunks.reverse();
 
-        let mut chunks_fr = Vec::new();
-        for chunk in chunks {
-            chunks_fr.push(big_int_to_fr(&chunk)?);
-        }
+        let poseidon_result = poseidon_hash_32_bytes(chunks)
+            .map_err(|e| anyhow::anyhow!("Poseidon hash failed: {}", e))?;
 
-        let poseidon_result =
-            poseidon_hash(chunks_fr).map_err(|e| anyhow::anyhow!("Poseidon hash failed: {}", e))?;
-
-        Ok(big_int_to_32_bytes(&poseidon_result))
+        Ok(poseidon_result)
     }
 
     fn parse_dg15_pubkey(dg15_bytes: &[u8]) -> Result<ActiveAuthKey, anyhow::Error> {
