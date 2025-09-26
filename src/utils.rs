@@ -67,3 +67,18 @@ pub fn unmarshal_fr(fr: Fr) -> Result<String, anyhow::Error> {
 
     return Ok(hex_str.to_string());
 }
+
+pub fn poseidon_hash(vec_fr: Vec<Fr>) -> Result<BigInt, anyhow::Error> {
+    let poseidon = poseidon_rs::Poseidon::new();
+    let hash_result = poseidon
+        .hash(vec_fr)
+        .map_err(|e| anyhow::anyhow!("Poseidon hash failed: {}", e))?;
+
+    let hex_str =
+        unmarshal_fr(hash_result).map_err(|e| anyhow::anyhow!("Failed to unmarshal Fr: {}", e))?;
+
+    let hash_big_int = BigInt::parse_bytes(hex_str.as_bytes(), 16)
+        .ok_or_else(|| anyhow::anyhow!("Failed to parse Poseidon hash result as BigInt"))?;
+
+    return Ok(hash_big_int);
+}
