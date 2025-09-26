@@ -87,7 +87,7 @@ impl RarimeDocument {
 
         let mut sign_attr_bytes = to_der(&sign_attr)?;
 
-        // The first byte must be 0xA0, which is the BER/DER tag for an **EXPLICIT**
+        // The first byte must be 0x31, which is the BER/DER tag for an **EXPLICIT**
         // Context-Specific element with tag number [0] (Class: Context-Specific, Tag: 0, Form: Constructed).
         //
         // This explicit tagging wraps the content, and the conversion (decoding/encoding)
