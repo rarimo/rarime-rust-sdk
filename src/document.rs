@@ -79,17 +79,13 @@ impl RarimeDocument {
     }
 
     fn get_passport_hash(sod: &[u8]) -> Result<[u8; 32], anyhow::Error> {
-        let sign_attr: ASN1Block = Self::extract_signed_attributes(&sod)
-            .map_err(|e| RarimeError::GetPassportKeyError(e.into()))?;
+        let sign_attr: ASN1Block = Self::extract_signed_attributes(&sod)?;
 
-        let hash_algorithm = RarimeDocument::extract_hash_algorithm(&sod)
-            .map_err(|e| RarimeError::GetPassportKeyError(e.into()))?;
+        let hash_algorithm = RarimeDocument::extract_hash_algorithm(&sod)?;
 
-        let parsed_hash_algorithm = RarimeDocument::parse_hash_algorithm(&hash_algorithm)
-            .map_err(|e| RarimeError::GetPassportKeyError(e.into()))?;
+        let parsed_hash_algorithm = RarimeDocument::parse_hash_algorithm(&hash_algorithm)?;
 
-        let mut sign_attr_bytes =
-            to_der(&sign_attr).map_err(|e| RarimeError::GetPassportKeyError(e.into()))?;
+        let mut sign_attr_bytes = to_der(&sign_attr)?;
         sign_attr_bytes[0] = 0x31;
 
         let hash_bytes = match parsed_hash_algorithm {
