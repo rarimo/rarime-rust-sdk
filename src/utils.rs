@@ -45,7 +45,7 @@ pub fn big_int_to_32_bytes(num: &BigInt) -> [u8; 32] {
 
     return out;
 }
-pub fn big_int_to_fr(num: &BigInt) -> Result<poseidon_rs::Fr, anyhow::Error> {
+fn big_int_to_fr(num: &BigInt) -> Result<poseidon_rs::Fr, anyhow::Error> {
     let decimal_str = num.to_string();
 
     let fr = poseidon_rs::Fr::from_str(&decimal_str)
@@ -68,8 +68,12 @@ pub fn unmarshal_fr(fr: Fr) -> Result<String, anyhow::Error> {
     return Ok(hex_str.to_string());
 }
 
-pub fn poseidon_hash(vec_fr: Vec<Fr>) -> Result<BigInt, anyhow::Error> {
+pub fn poseidon_hash_32_bytes(vec_big_int: Vec<BigInt>) -> Result<[u8; 32], anyhow::Error> {
     let poseidon = poseidon_rs::Poseidon::new();
+    let vec_fr: Vec<Fr> = vec_big_int
+        .into_iter()
+        .map(|x| big_int_to_fr(&x).unwrap())
+        .collect();
     let hash_result = poseidon
         .hash(vec_fr)
         .map_err(|e| anyhow::anyhow!("Poseidon hash failed: {}", e))?;
@@ -79,6 +83,7 @@ pub fn poseidon_hash(vec_fr: Vec<Fr>) -> Result<BigInt, anyhow::Error> {
 
     let hash_big_int = BigInt::parse_bytes(hex_str.as_bytes(), 16)
         .ok_or_else(|| anyhow::anyhow!("Failed to parse Poseidon hash result as BigInt"))?;
+    let big_int_32 = big_int_to_32_bytes(&hash_big_int);
 
-    return Ok(hash_big_int);
+    return Ok(big_int_32);
 }
