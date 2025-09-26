@@ -9,7 +9,7 @@ pub mod rarime_utils {
     use babyjubjub_rs::new_key;
 
     // GenerateBJJSecretKey generates a new secret key for the Baby JubJub curve.
-    pub fn generate_rarime_private_key() -> Result<[u8; 32], RarimeError> {
+    pub fn generate_bjj_private_key() -> Result<[u8; 32], RarimeError> {
         let private_key = new_key();
         let scalar = private_key.scalar_key();
         let (_, scalar_bytes) = scalar.to_bytes_be();
