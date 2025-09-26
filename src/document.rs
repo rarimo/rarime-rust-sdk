@@ -302,11 +302,11 @@ impl RarimeDocument {
                 if let ASN1Block::Unknown(_, _, _, tag, raw_bytes) = elem {
                     if format!("{:?}", tag) == "0" {
                         if let Ok(parsed) = from_der(&raw_bytes) {
-                            if parsed.len() == 1 {
-                                return Some(parsed.into_iter().next().unwrap());
+                            return if parsed.len() == 1 {
+                                Some(parsed.into_iter().next().unwrap())
                             } else {
-                                return Some(ASN1Block::Sequence(parsed.len(), parsed));
-                            }
+                                Some(ASN1Block::Sequence(parsed.len(), parsed))
+                            };
                         }
                     }
                 }
@@ -376,7 +376,7 @@ impl RarimeDocument {
                                 .map(|n| n.to_string())
                                 .collect::<Vec<_>>()
                                 .join(".");
-                            if (oid_string.starts_with("1.2.840.113549.1.1")) {
+                            if oid_string.starts_with("1.2.840.113549") {
                                 return Some(ASN1Block::ObjectIdentifier(*tag, oid.clone()));
                             }
                         }
@@ -390,8 +390,7 @@ impl RarimeDocument {
     }
     fn parse_hash_algorithm(oid: &ASN1Block) -> anyhow::Result<SignatureDigestHashAlgorithm> {
         let oid_string = if let ASN1Block::ObjectIdentifier(_, oid) = oid {
-            oid.as_vec::<&BigUint>()
-                .unwrap()
+            oid.as_vec::<&BigUint>()?
                 .iter()
                 .map(|n| n.to_string())
                 .collect::<Vec<_>>()
