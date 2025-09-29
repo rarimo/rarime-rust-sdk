@@ -22,10 +22,6 @@ pub mod rarime_utils {
 
         Ok(fixed_bytes)
     }
-
-    pub fn generate_aa_challenge(data: &[u8]) -> Result<Vec<u8>, RarimeError> {
-        todo!();
-    }
 }
 
 pub fn big_int_to_32_bytes(num: &BigInt) -> [u8; 32] {
@@ -44,15 +40,15 @@ pub fn big_int_to_32_bytes(num: &BigInt) -> [u8; 32] {
         let start_index = 32 - len;
         out[start_index..].copy_from_slice(&num_bytes);
     }
-    return out;
+    out
 }
 
 pub fn poseidon_hash_32_bytes(vec_big_int: &[BigInt]) -> Result<[u8; 32], RarimeError> {
     let poseidon = poseidon_rs::Poseidon::new();
     let vec_fr: Vec<Fr> = vec_big_int
-        .into_iter()
+        .iter()
         .map(|big_int| {
-            let (sign, bytes) = big_int.to_bytes_be();
+            let (_sign, bytes) = big_int.to_bytes_be();
 
             let mut repr = FrRepr::default();
 
@@ -63,7 +59,7 @@ pub fn poseidon_hash_32_bytes(vec_big_int: &[BigInt]) -> Result<[u8; 32], Rarime
             Fr::from_repr(repr).expect("error converting Repr to Fr")
         })
         .collect();
-    let hash_result: Fr = poseidon.hash(vec_fr).map_err(|e| PoseidonHashError(e))?;
+    let hash_result: Fr = poseidon.hash(vec_fr).map_err(PoseidonHashError)?;
 
     let repr = hash_result.into_repr();
 
@@ -76,5 +72,5 @@ pub fn poseidon_hash_32_bytes(vec_big_int: &[BigInt]) -> Result<[u8; 32], Rarime
 
     let big_int_32 = big_int_to_32_bytes(&result_big_int);
 
-    return Ok(big_int_32);
+    Ok(big_int_32)
 }

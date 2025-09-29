@@ -10,6 +10,12 @@ pub struct MastersCertificatePool<'a> {
     pub masters: Vec<rfc5280::Certificate<'a>>,
 }
 
+impl<'a> Default for MastersCertificatePool<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'a> MastersCertificatePool<'a> {
     pub fn new() -> Self {
         Self { masters: vec![] }
@@ -55,7 +61,7 @@ impl<'a> MastersCertificatePool<'a> {
             }
         }
 
-        return Ok(None);
+        Ok(None)
     }
 
     fn check_rsa(
@@ -85,8 +91,8 @@ impl<'a> MastersCertificatePool<'a> {
         let hashed = Self::hash_certificate(slave)?;
 
         match master_public_key.verify(hasher, &hashed, slave.signature_value.as_bytes()) {
-            Ok(_) => return Ok(true),
-            Err(_) => return Ok(false),
+            Ok(_) => Ok(true),
+            Err(_) => Ok(false),
         }
     }
 

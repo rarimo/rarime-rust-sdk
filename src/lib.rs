@@ -10,7 +10,9 @@ mod utils;
 
 use ::base64::DecodeError;
 use contracts::ContractsError;
+pub use document::{DocumentStatus, RarimeDocument, get_document_status};
 use thiserror::Error;
+pub use utils::rarime_utils;
 
 #[derive(Error, Debug)]
 pub enum RarimeError {
@@ -52,4 +54,6 @@ pub enum RarimeError {
     EmptyDer,
     #[error("Decoding ASN1 error: {0}")]
     ASN1DecodeError(#[from] simple_asn1::ASN1DecodeErr),
+    #[error(transparent)]
+    ContractError(ContractsError),
 }

@@ -20,10 +20,10 @@ pub enum DocumentStatus {
 }
 
 pub struct RarimeDocument {
-    pub(crate) data_group1: Vec<u8>,
+    pub(crate) _data_group1: Vec<u8>,
     pub(crate) data_group15: Option<Vec<u8>>,
-    pub(crate) aa_signature: Option<Vec<u8>>,
-    pub(crate) aa_challenge: Option<Vec<u8>>,
+    pub(crate) _aa_signature: Option<Vec<u8>>,
+    pub(crate) _aa_challenge: Option<Vec<u8>>,
     pub(crate) sod: Vec<u8>,
 }
 
@@ -42,9 +42,9 @@ pub async fn get_document_status(
 ) -> Result<DocumentStatus, RarimeError> {
     let passport_info = contracts::get_passport_info(passport_key)
         .await
-        .map_err(|e| RarimeError::GeneratePrivateKeyError)?;
+        .map_err(|e| RarimeError::ContractError(e))?;
     let zero_bytes = [0u8; 32];
-    let hex_zero_bytes = hex::encode(&zero_bytes);
+    let hex_zero_bytes = hex::encode(zero_bytes);
     let hex_active_identity = hex::encode(passport_info.passportInfo_.activeIdentity);
     let hex_profile_key = hex::encode(profile_key);
 
@@ -77,9 +77,9 @@ impl RarimeDocument {
     }
 
     fn get_passport_hash(sod: &[u8]) -> Result<[u8; 32], RarimeError> {
-        let sign_attr: ASN1Block = Self::extract_signed_attributes(&sod)?;
+        let sign_attr: ASN1Block = Self::extract_signed_attributes(sod)?;
 
-        let hash_algorithm = RarimeDocument::extract_hash_algorithm(&sod)?;
+        let hash_algorithm = RarimeDocument::extract_hash_algorithm(sod)?;
 
         let parsed_hash_algorithm = RarimeDocument::parse_hash_algorithm(&hash_algorithm)?;
 
@@ -110,7 +110,7 @@ impl RarimeDocument {
             .collect::<String>();
         let out = BigInt::parse_bytes(processed.as_bytes(), 2).expect("Invalid binary string");
 
-        let poseidon_hash = poseidon_hash_32_bytes(&vec![out])?;
+        let poseidon_hash = poseidon_hash_32_bytes(&[out])?;
 
         Ok(poseidon_hash)
     }
@@ -129,7 +129,7 @@ impl RarimeDocument {
         let x_mod = &x % &modulus;
         let y_mod = &y % &modulus;
 
-        let poseidon_hash = poseidon_hash_32_bytes(&vec![x_mod, y_mod])?;
+        let poseidon_hash = poseidon_hash_32_bytes(&[x_mod, y_mod])?;
 
         Ok(poseidon_hash)
     }
@@ -156,7 +156,7 @@ impl RarimeDocument {
             let chunk = &top_bits & &mask;
             chunks.push(chunk);
 
-            top_bits = top_bits >> size;
+            top_bits >>= size;
         }
 
         chunks.reverse();
@@ -200,26 +200,26 @@ impl RarimeDocument {
             }
         };
 
-        if let Ok(inner_blocks) = from_der(bitstring) {
-            if let ASN1Block::Sequence(_, rsa_inner) = &inner_blocks[0] {
-                let modulus = match &rsa_inner[0] {
-                    ASN1Block::Integer(_, n) => n.clone(),
-                    _ => {
-                        return Err(RarimeError::ASN1RouteError(
-                            "Expected INTEGER modulus".to_string(),
-                        ));
-                    }
-                };
-                let exponent = match &rsa_inner[1] {
-                    ASN1Block::Integer(_, e) => e.clone(),
-                    _ => {
-                        return Err(RarimeError::ASN1RouteError(
-                            "Expected INTEGER exponent".to_string(),
-                        ));
-                    }
-                };
-                return Ok(ActiveAuthKey::Rsa { modulus, exponent });
-            }
+        if let Ok(inner_blocks) = from_der(bitstring)
+            && let ASN1Block::Sequence(_, rsa_inner) = &inner_blocks[0]
+        {
+            let modulus = match &rsa_inner[0] {
+                ASN1Block::Integer(_, n) => n.clone(),
+                _ => {
+                    return Err(RarimeError::ASN1RouteError(
+                        "Expected INTEGER modulus".to_string(),
+                    ));
+                }
+            };
+            let exponent = match &rsa_inner[1] {
+                ASN1Block::Integer(_, e) => e.clone(),
+                _ => {
+                    return Err(RarimeError::ASN1RouteError(
+                        "Expected INTEGER exponent".to_string(),
+                    ));
+                }
+            };
+            return Ok(ActiveAuthKey::Rsa { modulus, exponent });
         }
 
         Ok(ActiveAuthKey::Ecdsa {
@@ -229,7 +229,7 @@ impl RarimeDocument {
 
     fn extract_signed_attributes(sod_bytes: &[u8]) -> Result<ASN1Block, RarimeError> {
         let blocks = from_der(sod_bytes).map_err(|e| RarimeError::DerError(e.to_string()))?;
-        let root = blocks.get(0).ok_or(RarimeError::EmptyDer)?;
+        let root = blocks.first().ok_or(RarimeError::EmptyDer)?;
 
         let app23_seq = match root {
             ASN1Block::Explicit(class, _, tag, content)
@@ -237,14 +237,14 @@ impl RarimeDocument {
             {
                 match content.as_ref() {
                     ASN1Block::Sequence(_, inner) => inner.clone(),
-                    other => {
+                    _other => {
                         return Err(RarimeError::ASN1RouteError(
                             "Expected SEQUENCE inside Application 23".to_string(),
                         ));
                     }
                 }
             }
-            other => {
+            _other => {
                 return Err(RarimeError::ASN1RouteError(
                     "Expected Application 23 at root".to_string(),
                 ));
@@ -269,11 +269,8 @@ impl RarimeDocument {
                     ASN1Block::Set(_, v) => v.clone(),
                     other => vec![other.clone()],
                 },
-                ASN1Block::Unknown(_, _, _, tag, raw_bytes) => {
-                    let inner =
-                        from_der(&raw_bytes).map_err(|e| RarimeError::DerError(e.to_string()))?;
-
-                    inner
+                ASN1Block::Unknown(_, _, _, _tag, raw_bytes) => {
+                    from_der(raw_bytes).map_err(|e| RarimeError::DerError(e.to_string()))?
                 }
                 other => match other {
                     ASN1Block::Sequence(_, v) => v.clone(),
@@ -286,12 +283,11 @@ impl RarimeDocument {
         let final_seq: Vec<ASN1Block> = tagged0_inner_blocks
             .iter()
             .find_map(|b| {
-                if let ASN1Block::Set(_, content) = b {
-                    if let Some(ASN1Block::Sequence(_, inner)) = content.get(0) {
-                        if inner.len() == 6 {
-                            return Some(inner.clone());
-                        }
-                    }
+                if let ASN1Block::Set(_, content) = b
+                    && let Some(ASN1Block::Sequence(_, inner)) = content.first()
+                    && inner.len() == 6
+                {
+                    return Some(inner.clone());
                 }
                 None
             })
@@ -302,25 +298,24 @@ impl RarimeDocument {
         let signed_attrs_block = final_seq
             .iter()
             .find_map(|elem| {
-                if let ASN1Block::Explicit(_, _, tag, content) = elem {
-                    if *tag == BigUint::from(0u32) {
-                        return Some(match content.as_ref() {
-                            ASN1Block::Set(_, v) => ASN1Block::Set(v.len(), v.clone()),
-                            ASN1Block::Sequence(_, v) => ASN1Block::Sequence(v.len(), v.clone()),
-                            other => other.clone(),
-                        });
-                    }
+                if let ASN1Block::Explicit(_, _, tag, content) = elem
+                    && *tag == BigUint::from(0u32)
+                {
+                    return Some(match content.as_ref() {
+                        ASN1Block::Set(_, v) => ASN1Block::Set(v.len(), v.clone()),
+                        ASN1Block::Sequence(_, v) => ASN1Block::Sequence(v.len(), v.clone()),
+                        other => other.clone(),
+                    });
                 }
-                if let ASN1Block::Unknown(_, _, _, tag, raw_bytes) = elem {
-                    if format!("{:?}", tag) == "0" {
-                        if let Ok(parsed) = from_der(&raw_bytes) {
-                            return if parsed.len() == 1 {
-                                Some(parsed.into_iter().next().unwrap())
-                            } else {
-                                Some(ASN1Block::Sequence(parsed.len(), parsed))
-                            };
-                        }
-                    }
+                if let ASN1Block::Unknown(_, _, _, tag, raw_bytes) = elem
+                    && format!("{:?}", tag) == "0"
+                    && let Ok(parsed) = from_der(raw_bytes)
+                {
+                    return if parsed.len() == 1 {
+                        Some(parsed.into_iter().next().unwrap())
+                    } else {
+                        Some(ASN1Block::Sequence(parsed.len(), parsed))
+                    };
                 }
 
                 None
@@ -357,10 +352,10 @@ impl RarimeDocument {
         let tagged0 = app23_seq
             .iter()
             .find_map(|b| {
-                if let ASN1Block::Explicit(_, _, tag, content) = b {
-                    if *tag == BigUint::from(0u32) {
-                        return Some(content.as_ref());
-                    }
+                if let ASN1Block::Explicit(_, _, tag, content) = b
+                    && *tag == BigUint::from(0u32)
+                {
+                    return Some(content.as_ref());
                 }
                 None
             })
@@ -380,12 +375,11 @@ impl RarimeDocument {
         let sequence_block = inner_seq
             .iter()
             .find_map(|b| {
-                if let ASN1Block::Set(_, content) = b {
-                    if let Some(ASN1Block::Sequence(_, inner)) = content.get(0) {
-                        if inner.len() == 6 {
-                            return Some(inner.clone());
-                        }
-                    }
+                if let ASN1Block::Set(_, content) = b
+                    && let Some(ASN1Block::Sequence(_, inner)) = content.first()
+                    && inner.len() == 6
+                {
+                    return Some(inner.clone());
                 }
                 None
             })
@@ -396,20 +390,19 @@ impl RarimeDocument {
         let sig_alg_block = sequence_block
             .iter()
             .find_map(|b| {
-                if let ASN1Block::Sequence(_, inner) = b {
-                    if inner.len() == 2 {
-                        if let ASN1Block::ObjectIdentifier(tag, oid) = &inner[0] {
-                            let oid_string = oid
-                                .as_vec::<&BigUint>()
-                                .unwrap()
-                                .iter()
-                                .map(|n| n.to_string())
-                                .collect::<Vec<_>>()
-                                .join(".");
-                            if oid_string.starts_with("1.2.840.113549") {
-                                return Some(ASN1Block::ObjectIdentifier(*tag, oid.clone()));
-                            }
-                        }
+                if let ASN1Block::Sequence(_, inner) = b
+                    && inner.len() == 2
+                    && let ASN1Block::ObjectIdentifier(tag, oid) = &inner[0]
+                {
+                    let oid_string = oid
+                        .as_vec::<&BigUint>()
+                        .unwrap()
+                        .iter()
+                        .map(|n| n.to_string())
+                        .collect::<Vec<_>>()
+                        .join(".");
+                    if oid_string.starts_with("1.2.840.113549") {
+                        return Some(ASN1Block::ObjectIdentifier(*tag, oid.clone()));
                     }
                 }
                 None
@@ -423,7 +416,7 @@ impl RarimeDocument {
     fn parse_hash_algorithm(oid: &ASN1Block) -> Result<SignatureDigestHashAlgorithm, RarimeError> {
         let oid_string = if let ASN1Block::ObjectIdentifier(_, oid) = oid {
             oid.as_vec::<&BigUint>()
-                .map_err(|e| RarimeError::ASN1DecodeError(e))?
+                .map_err(RarimeError::ASN1DecodeError)?
                 .iter()
                 .map(|n| n.to_string())
                 .collect::<Vec<_>>()
