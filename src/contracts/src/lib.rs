@@ -3,15 +3,29 @@ mod state_keeper;
 use alloy::hex::FromHexError;
 use alloy::sol;
 use thiserror::Error;
-#[cfg(debug_assertions)]
-pub(crate) const RPC_URL: &str = "https://rpc.evm.mainnet.rarimo.com";
-#[cfg(debug_assertions)]
-pub(crate) const STATE_KEEPER_CONTRACT_ADDRESS: &str = "0x9EDADB216C1971cf0343b8C687cF76E7102584DB";
 
-#[cfg(not(debug_assertions))]
-pub(crate) const RPC_URL: &str = "https://l2.rarimo.com";
-#[cfg(not(debug_assertions))]
-pub(crate) const STATE_KEEPER_CONTRACT_ADDRESS: &str = "0x61aa5b68D811884dA4FEC2De4a7AA0464df166E1";
+#[derive(Debug, Clone)]
+pub struct ContractsProviderConfig {
+    pub rpc_url: String,
+    pub state_keeper_contract_address: String,
+}
+
+pub struct ContractsProvider {
+    pub config: ContractsProviderConfig,
+}
+
+impl ContractsProvider {
+    pub fn new(config: ContractsProviderConfig) -> Self {
+        Self { config }
+    }
+
+    pub async fn get_passport_info(
+        &self,
+        passport_key: &[u8; 32],
+    ) -> Result<StateKeeper::getPassportInfoReturn, ContractsError> {
+        state_keeper::get_passport_info(&self.config, passport_key).await
+    }
+}
 
 sol!(
     #[sol(rpc)]
@@ -19,7 +33,7 @@ sol!(
     StateKeeper,
     "src/abi/StateKeeper.json"
 );
-pub use state_keeper::get_passport_info;
+
 #[derive(Debug, Error)]
 pub enum ContractsError {
     #[error("Failed to parse the RPC URL: {0}")]

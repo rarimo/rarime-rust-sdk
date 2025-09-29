@@ -5,6 +5,7 @@ use const_oid::db::rfc5912::{
     PKCS_1, SHA_1_WITH_RSA_ENCRYPTION, SHA_224_WITH_RSA_ENCRYPTION, SHA_256_WITH_RSA_ENCRYPTION,
     SHA_384_WITH_RSA_ENCRYPTION, SHA_512_WITH_RSA_ENCRYPTION,
 };
+use contracts::{ContractsProvider, ContractsProviderConfig};
 use digest::Digest;
 use num_bigint::BigInt;
 use num_traits::One;
@@ -23,7 +24,7 @@ pub enum DocumentStatus {
     RegisteredWithOtherPk,
 }
 
-pub struct RarimeDocument {
+pub struct RarimePassport {
     pub(crate) _data_group1: Vec<u8>,
     pub(crate) data_group15: Option<Vec<u8>>,
     pub(crate) _aa_signature: Option<Vec<u8>>,
@@ -40,13 +41,13 @@ enum SignatureDigestHashAlgorithm {
     SHA512,
 }
 
-pub async fn get_document_status(
+pub(crate) async fn get_document_status(
     passport_key: &[u8; 32],
     profile_key: &[u8; 32],
+    config: ContractsProviderConfig,
 ) -> Result<DocumentStatus, RarimeError> {
-    let passport_info = contracts::get_passport_info(passport_key)
-        .await
-        .map_err(RarimeError::ContractError)?;
+    let contacts = ContractsProvider::new(config);
+    let passport_info = contacts.get_passport_info(passport_key).await?;
 
     let zero_bytes: [u8; 32] = [0u8; 32];
 
@@ -62,16 +63,16 @@ pub async fn get_document_status(
     Ok(DocumentStatus::RegisteredWithOtherPk)
 }
 
-impl RarimeDocument {
-    pub fn get_passport_key(&self) -> Result<[u8; 32], RarimeError> {
+impl RarimePassport {
+    pub(crate) fn get_passport_key(&self) -> Result<[u8; 32], RarimeError> {
         if let Some(dg15_bytes) = &self.data_group15 {
             let key = Self::parse_dg15_pubkey(dg15_bytes)?;
             return match key {
                 ActiveAuthKey::Ecdsa { key_bytes } => {
-                    RarimeDocument::extract_ecdsa_passport_key(&key_bytes)
+                    RarimePassport::extract_ecdsa_passport_key(&key_bytes)
                 }
                 ActiveAuthKey::Rsa { modulus, exponent } => {
-                    RarimeDocument::extract_rsa_passport_key(&modulus, &exponent)
+                    RarimePassport::extract_rsa_passport_key(&modulus, &exponent)
                 }
             };
         }
@@ -84,9 +85,9 @@ impl RarimeDocument {
     fn get_passport_hash(sod: &[u8]) -> Result<[u8; 32], RarimeError> {
         let sign_attr: ASN1Block = Self::extract_signed_attributes(sod)?;
 
-        let hash_algorithm = RarimeDocument::extract_hash_algorithm(sod)?;
+        let hash_algorithm = RarimePassport::extract_hash_algorithm(sod)?;
 
-        let parsed_hash_algorithm = RarimeDocument::parse_hash_algorithm(&hash_algorithm)?;
+        let parsed_hash_algorithm = RarimePassport::parse_hash_algorithm(&hash_algorithm)?;
 
         let mut sign_attr_bytes =
             to_der(&sign_attr).map_err(|e| RarimeError::DerError(e.to_string()))?;

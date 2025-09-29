@@ -8,9 +8,77 @@ mod owned_cert;
 mod treap_tree;
 mod utils;
 
+#[derive(Debug, Clone)]
+pub struct RarimeUserConfiguration {
+    pub user_private_key: Option<[u8; 32]>,
+}
+#[derive(Debug, Clone)]
+pub struct RarimeAPIConfiguration {
+    pub json_rpc_evm_url: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct RarimeContractsConfiguration {
+    pub state_keeper_contract_address: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct RarimeConfiguration {
+    pub contracts_configuration: RarimeContractsConfiguration,
+    pub api_configuration: RarimeAPIConfiguration,
+    pub user_configuration: RarimeUserConfiguration,
+}
+
+pub struct Rarime {
+    config: RarimeConfiguration,
+}
+
+impl Rarime {
+    pub fn new(config: RarimeConfiguration) -> Self {
+        Self { config }
+    }
+
+    pub async fn get_identity_status(
+        &mut self,
+        passport: &RarimePassport,
+    ) -> Result<DocumentStatus, RarimeError> {
+        let config = ContractsProviderConfig {
+            rpc_url: self.config.api_configuration.json_rpc_evm_url.clone(),
+            state_keeper_contract_address: self
+                .config
+                .contracts_configuration
+                .state_keeper_contract_address
+                .clone(),
+        };
+        let profile_key: [u8; 32] = match self.config.user_configuration.user_private_key.clone() {
+            Some(key) => key,
+            None => {
+                let new_key = RarimeUtils::generate_bjj_private_key()?;
+                self.config.user_configuration.user_private_key = Some(new_key);
+                new_key
+            }
+        };
+
+        let passport_key = passport.get_passport_key()?;
+
+        let result = get_document_status(&passport_key, &profile_key, config).await?;
+
+        Ok(result)
+    }
+}
+
+pub struct RarimeUtils {}
+
+impl RarimeUtils {
+    pub fn generate_bjj_private_key() -> Result<[u8; 32], RarimeError> {
+        return rarime_utils::generate_bjj_private_key();
+    }
+}
+
+use crate::document::{DocumentStatus, get_document_status};
 use ::base64::DecodeError;
-use contracts::ContractsError;
-pub use document::{DocumentStatus, RarimeDocument, get_document_status};
+use contracts::{ContractsError, ContractsProviderConfig};
+pub use document::RarimePassport;
 use thiserror::Error;
 pub use utils::rarime_utils;
 
