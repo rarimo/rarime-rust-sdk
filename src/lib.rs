@@ -9,6 +9,7 @@ mod treap_tree;
 mod utils;
 
 use ::base64::DecodeError;
+use contracts::ContractsError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -29,16 +30,26 @@ pub enum RarimeError {
     NoCertificatesFound,
     #[error("UTF-8 error: {0}")]
     UTF8Error(#[from] std::str::Utf8Error),
-    #[error("decoding error: {0}")]
+    #[error("Decoding error: {0}")]
     DecodeError(#[from] DecodeError),
     #[error("Der error: {0}")]
     DerError(String),
-    #[error("Unsupported type of pub key")]
-    UnsupportedKey,
+    #[error("Unsupported type of public key")]
+    UnsupportedPassportKey,
     #[error("Parsing DG15 error: {0}")]
-    ParseDg15Error(anyhow::Error),
+    ParseDg15Error(String),
     #[error("Get passport key error: {0}")]
-    GetPassportKeyError(anyhow::Error),
+    GetPassportKeyError(String),
     #[error("Generate private key error")]
     GeneratePrivateKeyError,
+    #[error("Poseidon error: {0}")]
+    PoseidonHashError(String),
+    #[error("Contract error: {0}")]
+    ContractCallError(#[from] ContractsError),
+    #[error("{0}")]
+    ASN1RouteError(String),
+    #[error("Empty DER data: expected at least one block")]
+    EmptyDer,
+    #[error("Decoding ASN1 error: {0}")]
+    ASN1DecodeError(#[from] simple_asn1::ASN1DecodeErr),
 }

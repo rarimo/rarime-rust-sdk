@@ -1,3 +1,5 @@
+use crate::RarimeError;
+use crate::RarimeError::PoseidonHashError;
 use ff::{PrimeField, PrimeFieldRepr};
 use num_bigint::BigInt;
 use num_traits::Zero;
@@ -45,7 +47,7 @@ pub fn big_int_to_32_bytes(num: &BigInt) -> [u8; 32] {
     return out;
 }
 
-pub fn poseidon_hash_32_bytes(vec_big_int: &[BigInt]) -> Result<[u8; 32], anyhow::Error> {
+pub fn poseidon_hash_32_bytes(vec_big_int: &[BigInt]) -> Result<[u8; 32], RarimeError> {
     let poseidon = poseidon_rs::Poseidon::new();
     let vec_fr: Vec<Fr> = vec_big_int
         .into_iter()
@@ -61,9 +63,7 @@ pub fn poseidon_hash_32_bytes(vec_big_int: &[BigInt]) -> Result<[u8; 32], anyhow
             Fr::from_repr(repr).expect("error converting Repr to Fr")
         })
         .collect();
-    let hash_result: Fr = poseidon
-        .hash(vec_fr)
-        .map_err(|e| anyhow::anyhow!("Poseidon hash failed: {}", e))?;
+    let hash_result: Fr = poseidon.hash(vec_fr).map_err(|e| PoseidonHashError(e))?;
 
     let repr = hash_result.into_repr();
 
