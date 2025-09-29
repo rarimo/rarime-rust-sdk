@@ -4,7 +4,7 @@ use alloy::providers::ProviderBuilder;
 use std::str::FromStr;
 
 pub async fn get_passport_info(
-    passport_key: [u8; 32],
+    passport_key: &[u8; 32],
 ) -> Result<StateKeeper::getPassportInfoReturn, ContractsError> {
     let provider = ProviderBuilder::new().connect_http(RPC_URL.parse()?);
 

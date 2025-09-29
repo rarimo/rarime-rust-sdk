@@ -54,6 +54,10 @@ pub enum RarimeError {
     EmptyDer,
     #[error("Decoding ASN1 error: {0}")]
     ASN1DecodeError(#[from] simple_asn1::ASN1DecodeErr),
+    #[error("Encoding ASN1 error: {0}")]
+    ASN1EncodeError(#[from] simple_asn1::ASN1EncodeErr),
     #[error(transparent)]
     ContractError(ContractsError),
+    #[error("OID operation error: {0}")]
+    OIDError(const_oid::Error),
 }

@@ -1,7 +1,11 @@
 use crate::RarimeError;
 use crate::utils::poseidon_hash_32_bytes;
+use const_oid::ObjectIdentifier;
+use const_oid::db::rfc5912::{
+    PKCS_1, SHA_1_WITH_RSA_ENCRYPTION, SHA_224_WITH_RSA_ENCRYPTION, SHA_256_WITH_RSA_ENCRYPTION,
+    SHA_384_WITH_RSA_ENCRYPTION, SHA_512_WITH_RSA_ENCRYPTION,
+};
 use digest::Digest;
-use ff::*;
 use num_bigint::BigInt;
 use num_traits::One;
 use sha1::Sha1;
@@ -37,23 +41,24 @@ enum SignatureDigestHashAlgorithm {
 }
 
 pub async fn get_document_status(
-    passport_key: [u8; 32],
-    profile_key: [u8; 32],
+    passport_key: &[u8; 32],
+    profile_key: &[u8; 32],
 ) -> Result<DocumentStatus, RarimeError> {
     let passport_info = contracts::get_passport_info(passport_key)
         .await
-        .map_err(|e| RarimeError::ContractError(e))?;
-    let zero_bytes = [0u8; 32];
-    let hex_zero_bytes = hex::encode(zero_bytes);
-    let hex_active_identity = hex::encode(passport_info.passportInfo_.activeIdentity);
-    let hex_profile_key = hex::encode(profile_key);
+        .map_err(RarimeError::ContractError)?;
 
-    if hex_active_identity == hex_zero_bytes {
+    let zero_bytes: [u8; 32] = [0u8; 32];
+
+    let active_identity = passport_info.passportInfo_.activeIdentity;
+
+    if active_identity == zero_bytes {
         return Ok(DocumentStatus::NotRegistered);
     }
-    if hex_active_identity == hex_profile_key {
+    if active_identity == profile_key {
         return Ok(DocumentStatus::RegisteredWithThisPk);
     }
+
     Ok(DocumentStatus::RegisteredWithOtherPk)
 }
 
@@ -312,7 +317,7 @@ impl RarimeDocument {
                     && let Ok(parsed) = from_der(raw_bytes)
                 {
                     return if parsed.len() == 1 {
-                        Some(parsed.into_iter().next().unwrap())
+                        Some(parsed.into_iter().next().expect("ASN1 parser returned an empty list when exactly one item was expected."))
                     } else {
                         Some(ASN1Block::Sequence(parsed.len(), parsed))
                     };
@@ -396,12 +401,13 @@ impl RarimeDocument {
                 {
                     let oid_string = oid
                         .as_vec::<&BigUint>()
-                        .unwrap()
+                        .ok()?
                         .iter()
                         .map(|n| n.to_string())
                         .collect::<Vec<_>>()
                         .join(".");
-                    if oid_string.starts_with("1.2.840.113549") {
+
+                    if oid_string.starts_with(PKCS_1.to_string().as_str()) {
                         return Some(ASN1Block::ObjectIdentifier(*tag, oid.clone()));
                     }
                 }
@@ -413,26 +419,29 @@ impl RarimeDocument {
 
         Ok(sig_alg_block)
     }
-    fn parse_hash_algorithm(oid: &ASN1Block) -> Result<SignatureDigestHashAlgorithm, RarimeError> {
-        let oid_string = if let ASN1Block::ObjectIdentifier(_, oid) = oid {
-            oid.as_vec::<&BigUint>()
-                .map_err(RarimeError::ASN1DecodeError)?
-                .iter()
-                .map(|n| n.to_string())
-                .collect::<Vec<_>>()
-                .join(".")
+
+    fn parse_hash_algorithm(
+        oid_block: &ASN1Block,
+    ) -> Result<SignatureDigestHashAlgorithm, RarimeError> {
+        let oid: ObjectIdentifier = if let ASN1Block::ObjectIdentifier(_, raw_oid) = oid_block {
+            ObjectIdentifier::from_bytes(
+                &raw_oid
+                    .as_raw()
+                    .map_err(|e| RarimeError::ASN1EncodeError(e))?,
+            )
+            .map_err(|e| RarimeError::OIDError(e))?
         } else {
             return Err(RarimeError::ASN1RouteError(
-                "Not an ObjectIdentifier".to_string(),
+                "Expected ObjectIdentifier block".to_string(),
             ));
         };
 
-        match oid_string.as_str() {
-            "1.2.840.113549.1.1.5" => Ok(SignatureDigestHashAlgorithm::SHA1),
-            "1.2.840.113549.1.1.14" => Ok(SignatureDigestHashAlgorithm::SHA224),
-            "1.2.840.113549.1.1.11" => Ok(SignatureDigestHashAlgorithm::SHA256),
-            "1.2.840.113549.1.1.12" => Ok(SignatureDigestHashAlgorithm::SHA384),
-            "1.2.840.113549.1.1.13" => Ok(SignatureDigestHashAlgorithm::SHA512),
+        match oid {
+            SHA_1_WITH_RSA_ENCRYPTION => Ok(SignatureDigestHashAlgorithm::SHA1),
+            SHA_224_WITH_RSA_ENCRYPTION => Ok(SignatureDigestHashAlgorithm::SHA224),
+            SHA_256_WITH_RSA_ENCRYPTION => Ok(SignatureDigestHashAlgorithm::SHA256),
+            SHA_384_WITH_RSA_ENCRYPTION => Ok(SignatureDigestHashAlgorithm::SHA384),
+            SHA_512_WITH_RSA_ENCRYPTION => Ok(SignatureDigestHashAlgorithm::SHA512),
             _ => Err(RarimeError::ASN1RouteError(
                 "Not supported ObjectIdentifier".to_string(),
             )),
