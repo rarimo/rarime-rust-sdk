@@ -48,7 +48,7 @@ pub fn poseidon_hash_32_bytes(vec_big_int: &[BigInt]) -> Result<[u8; 32], Rarime
     let vec_fr: Vec<Fr> = vec_big_int
         .iter()
         .map(|big_int| {
-            let (_sign, bytes) = big_int.to_bytes_be();
+            let bytes = big_int_to_32_bytes(big_int);
 
             let mut repr = FrRepr::default();
 
@@ -73,4 +73,35 @@ pub fn poseidon_hash_32_bytes(vec_big_int: &[BigInt]) -> Result<[u8; 32], Rarime
     let big_int_32 = big_int_to_32_bytes(&result_big_int);
 
     Ok(big_int_32)
+}
+pub fn get_profile_key(private_key: &[u8; 32]) -> Result<[u8; 32], RarimeError> {
+    let scalar_int = BigInt::from_bytes_be(num_bigint::Sign::Plus, private_key);
+
+    let b8 = babyjubjub_rs::Point {
+        x: babyjubjub_rs::Fr::from_str(
+            "5299619240641551281634865583518297030282874472190772894086521144482721001553",
+        )
+        .unwrap(),
+        y: babyjubjub_rs::Fr::from_str(
+            "16950150798460657717958625567821834550301663161624707787222815936182638968203",
+        )
+        .unwrap(),
+    };
+    let pub_point = b8.mul_scalar(&scalar_int);
+    let mut x_raw_bytes = Vec::new();
+    let x_raw = pub_point.x.into_repr();
+    x_raw
+        .write_be(&mut x_raw_bytes)
+        .expect("Error converting repr to bytes");
+    let x_big_int = BigInt::from_bytes_be(num_bigint::Sign::Plus, &x_raw_bytes);
+
+    let mut y_raw_bytes = Vec::new();
+    let y_raw = pub_point.y.into_repr();
+    y_raw
+        .write_be(&mut y_raw_bytes)
+        .expect("Error converting repr to bytes");
+    let y_big_int = BigInt::from_bytes_be(num_bigint::Sign::Plus, &y_raw_bytes);
+
+    let profile_key = poseidon_hash_32_bytes(&vec![x_big_int, y_big_int])?;
+    Ok(profile_key)
 }

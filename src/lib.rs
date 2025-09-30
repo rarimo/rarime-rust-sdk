@@ -50,7 +50,7 @@ impl Rarime {
                 .state_keeper_contract_address
                 .clone(),
         };
-        let profile_key: [u8; 32] = match self.config.user_configuration.user_private_key.clone() {
+        let private_key: [u8; 32] = match self.config.user_configuration.user_private_key.clone() {
             Some(key) => key,
             None => {
                 let new_key = RarimeUtils::generate_bjj_private_key()?;
@@ -58,6 +58,7 @@ impl Rarime {
                 new_key
             }
         };
+        let profile_key = get_profile_key(&private_key)?;
 
         let passport_key = passport.get_passport_key()?;
 
@@ -75,7 +76,9 @@ impl RarimeUtils {
     }
 }
 
-use crate::document::{DocumentStatus, get_document_status};
+pub use crate::document::DocumentStatus;
+use crate::document::get_document_status;
+use crate::utils::get_profile_key;
 use ::base64::DecodeError;
 use contracts::{ContractsError, ContractsProviderConfig};
 pub use document::RarimePassport;

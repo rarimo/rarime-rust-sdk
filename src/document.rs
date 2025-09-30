@@ -8,7 +8,7 @@ use const_oid::db::rfc5912::{
 use contracts::{ContractsProvider, ContractsProviderConfig};
 use digest::Digest;
 use num_bigint::BigInt;
-use num_traits::One;
+use num_traits::{One, Zero};
 use sha1::Sha1;
 use sha2::{Sha224, Sha256, Sha384, Sha512};
 use simple_asn1::{ASN1Block, ASN1Class, BigUint, from_der, to_der};
@@ -18,6 +18,7 @@ enum ActiveAuthKey {
     Ecdsa { key_bytes: Vec<u8> },
 }
 
+#[derive(Debug)]
 pub enum DocumentStatus {
     NotRegistered,
     RegisteredWithThisPk,
@@ -25,11 +26,11 @@ pub enum DocumentStatus {
 }
 
 pub struct RarimePassport {
-    pub(crate) _data_group1: Vec<u8>,
-    pub(crate) data_group15: Option<Vec<u8>>,
-    pub(crate) _aa_signature: Option<Vec<u8>>,
-    pub(crate) _aa_challenge: Option<Vec<u8>>,
-    pub(crate) sod: Vec<u8>,
+    pub data_group1: Vec<u8>,
+    pub data_group15: Option<Vec<u8>>,
+    pub aa_signature: Option<Vec<u8>>,
+    pub aa_challenge: Option<Vec<u8>>,
+    pub sod: Vec<u8>,
 }
 
 #[derive(Debug)]
@@ -59,7 +60,6 @@ pub(crate) async fn get_document_status(
     if active_identity == profile_key {
         return Ok(DocumentStatus::RegisteredWithThisPk);
     }
-
     Ok(DocumentStatus::RegisteredWithOtherPk)
 }
 
@@ -86,7 +86,6 @@ impl RarimePassport {
         let sign_attr: ASN1Block = Self::extract_signed_attributes(sod)?;
 
         let hash_algorithm = RarimePassport::extract_hash_algorithm(sod)?;
-
         let parsed_hash_algorithm = RarimePassport::parse_hash_algorithm(&hash_algorithm)?;
 
         let mut sign_attr_bytes =
@@ -102,19 +101,26 @@ impl RarimePassport {
             SignatureDigestHashAlgorithm::SHA384 => Sha384::digest(&sign_attr_bytes).to_vec(),
             SignatureDigestHashAlgorithm::SHA512 => Sha512::digest(&sign_attr_bytes).to_vec(),
         };
+
         let mut padded_hash = [0u8; 32];
         let len = std::cmp::min(hash_bytes.len(), 32);
         padded_hash[..len].copy_from_slice(&hash_bytes[..len]);
 
-        let hash_int = BigInt::from_bytes_be(num_bigint::Sign::Plus, &padded_hash);
-
-        let binary_string = hash_int.to_str_radix(2);
-        let padded_binary_string = format!("{:0>256}", binary_string);
-        let processed = &padded_binary_string[..252]
-            .chars()
-            .rev()
-            .collect::<String>();
-        let out = BigInt::parse_bytes(processed.as_bytes(), 2).expect("Invalid binary string");
+        let mut out = BigInt::zero();
+        let mut acc: u64 = 0;
+        let mut acc_bits = 0usize;
+        for i in (0..252).rev() {
+            acc = (acc << 1) | (((padded_hash[i / 8] >> (7 - (i % 8))) & 1) as u64);
+            acc_bits += 1;
+            if acc_bits == 64 {
+                out = (out << 64) | BigInt::from(acc);
+                acc = 0;
+                acc_bits = 0;
+            }
+        }
+        if acc_bits > 0 {
+            out = (out << acc_bits) | BigInt::from(acc);
+        }
 
         let poseidon_hash = poseidon_hash_32_bytes(&[out])?;
 
