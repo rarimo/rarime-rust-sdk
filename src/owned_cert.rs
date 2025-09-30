@@ -1,3 +1,4 @@
+#![allow(unused)]
 use crate::RarimeError;
 use base64::{Engine as _, engine::general_purpose};
 use cms::content_info::ContentInfo;
@@ -11,31 +12,31 @@ use x509_parser::public_key::PublicKey;
 
 // Define the Master List structure similar to your Go code
 #[derive(Debug)]
-pub struct _MasterList {
+pub struct MasterList {
     pub version: i32,
     pub cert_list: Vec<Vec<u8>>, // Raw certificate data - each Vec<u8> is a certificate in DER format
 }
 
-pub struct _LdifParser {
+pub struct LdifParser {
     pkd_regex: Regex,
 }
 
 // A wrapper that owns the certificate DER data
 #[derive(Clone)]
-pub struct _OwnedCertificate {
+pub struct OwnedCertificate {
     der_data: Vec<u8>,
 }
 
-impl<'a> _OwnedCertificate {
-    pub fn _from_der(der_data: Vec<u8>) -> Result<Self, RarimeError> {
+impl<'a> OwnedCertificate {
+    pub fn from_der(der_data: Vec<u8>) -> Result<Self, RarimeError> {
         // Validate that this is a valid certificate
         X509Certificate::from_der(&der_data)
             .map_err(|e| RarimeError::X509Error(format!("Invalid certificate DER data: {}", e)))?;
 
-        Ok(_OwnedCertificate { der_data })
+        Ok(OwnedCertificate { der_data })
     }
 
-    pub fn _from_pem(pem_bytes: Vec<u8>) -> Result<Self, RarimeError> {
+    pub fn from_pem(pem_bytes: Vec<u8>) -> Result<Self, RarimeError> {
         let content = str::from_utf8(&pem_bytes)?;
         let pem_obj = ::pem::parse(content)
             .map_err(|e| RarimeError::PemError(format!("Failed to parse PEM data: {}", e)))?;
@@ -47,31 +48,31 @@ impl<'a> _OwnedCertificate {
         }
 
         let der_data = pem_obj.contents().to_vec();
-        Self::_from_der(der_data)
+        Self::from_der(der_data)
     }
 
-    pub fn _parse(&'a self) -> Result<X509Certificate<'a>, RarimeError> {
+    pub fn parse(&'a self) -> Result<X509Certificate<'a>, RarimeError> {
         let (_, cert) = X509Certificate::from_der(&self.der_data)
             .map_err(|e| RarimeError::X509Error(format!("Failed to parse certificate: {}", e)))?;
         Ok(cert)
     }
 
-    pub fn _der_data(&self) -> &[u8] {
+    pub fn der_data(&self) -> &[u8] {
         &self.der_data
     }
 
     /// Find the master certificate that signed this slave certificate
     /// Returns the first matching master certificate from the provided list
-    pub fn _find_master_certificate(
+    pub fn find_master_certificate(
         &self,
-        masters: &[_OwnedCertificate],
-    ) -> Result<Option<_OwnedCertificate>, RarimeError> {
-        let slave_cert = self._parse()?;
+        masters: &[OwnedCertificate],
+    ) -> Result<Option<OwnedCertificate>, RarimeError> {
+        let slave_cert = self.parse()?;
 
         // Find candidates by matching issuer with subject
         let mut candidates = Vec::new();
         for master in masters {
-            let master_cert = master._parse()?;
+            let master_cert = master.parse()?;
 
             // Check if issuer matches subject
             if slave_cert.issuer() == master_cert.subject() {
@@ -80,14 +81,14 @@ impl<'a> _OwnedCertificate {
         }
 
         // Get the Authority Key Identifier from the slave certificate
-        let slave_aki = self._extract_authority_key_identifier(&slave_cert)?;
+        let slave_aki = self.extract_authority_key_identifier(&slave_cert)?;
 
         // Filter candidates by matching AKI with SKI
         for candidate in candidates {
-            let master_cert = candidate._parse()?;
+            let master_cert = candidate.parse()?;
 
             // Get the Subject Key Identifier from the master certificate
-            if let Ok(master_ski) = self._extract_subject_key_identifier(&master_cert)
+            if let Ok(master_ski) = self.extract_subject_key_identifier(&master_cert)
                 && slave_aki == master_ski
             {
                 return Ok(Some(candidate));
@@ -98,7 +99,7 @@ impl<'a> _OwnedCertificate {
     }
 
     /// Extract Authority Key Identifier from a certificate
-    fn _extract_authority_key_identifier(
+    fn extract_authority_key_identifier(
         &self,
         cert: &X509Certificate,
     ) -> Result<Vec<u8>, RarimeError> {
@@ -118,7 +119,7 @@ impl<'a> _OwnedCertificate {
     }
 
     /// Extract Subject Key Identifier from a certificate
-    fn _extract_subject_key_identifier(
+    fn extract_subject_key_identifier(
         &self,
         cert: &X509Certificate,
     ) -> Result<Vec<u8>, RarimeError> {
@@ -136,9 +137,9 @@ impl<'a> _OwnedCertificate {
         ))
     }
 
-    pub fn _extract_raw_public_key(&self) -> Result<Vec<u8>, RarimeError> {
+    pub fn extract_raw_public_key(&self) -> Result<Vec<u8>, RarimeError> {
         // Extract the public key matching Go's ExtractPubKeys behavior
-        let cert = self._parse()?;
+        let cert = self.parse()?;
         let public_key_info = cert.public_key();
 
         let parsed_public_key = match public_key_info.parsed() {
@@ -155,26 +156,26 @@ impl<'a> _OwnedCertificate {
             PublicKey::RSA(rsa_key) => {
                 // Extract RSA modulus and normalize it
                 let modulus: Vec<u8> = rsa_key.modulus.to_vec();
-                Self::_normalize_key_data(modulus)
+                Self::normalize_key_data(modulus)
             }
             PublicKey::EC(ec_point) => {
                 // For EC keys, extract and normalize the point data
                 let point_data = ec_point.data().to_vec();
-                Self::_normalize_ec_point(point_data)
+                Self::normalize_ec_point(point_data)
             }
             PublicKey::DSA(dsa_key) => {
                 // For DSA, normalize the public key data
-                Self::_normalize_key_data(dsa_key.to_vec())
+                Self::normalize_key_data(dsa_key.to_vec())
             }
             PublicKey::GostR3410(gost_key) => {
                 println!("GostR3410 public key found");
                 // For GOST R 34.10, normalize the public key data
-                Self::_normalize_key_data(gost_key.to_vec())
+                Self::normalize_key_data(gost_key.to_vec())
             }
             PublicKey::GostR3410_2012(gost_key) => {
                 println!("GostR3410-2012 public key found");
                 // For GOST R 34.10-2012, normalize the public key data
-                Self::_normalize_key_data(gost_key.to_vec())
+                Self::normalize_key_data(gost_key.to_vec())
             }
             _ => {
                 // For other public key types, get the raw subject public key bits
@@ -182,7 +183,7 @@ impl<'a> _OwnedCertificate {
                 let raw_bits = spki.to_der_vec_raw().map_err(|e| {
                     RarimeError::X509Error(format!("Failed to serialize public key: {}", e))
                 })?;
-                Self::_normalize_key_data(raw_bits)
+                Self::normalize_key_data(raw_bits)
             }
         };
 
@@ -190,7 +191,7 @@ impl<'a> _OwnedCertificate {
     }
 
     /// Normalize key data by removing common prefixes and padding
-    fn _normalize_key_data(mut key_data: Vec<u8>) -> Vec<u8> {
+    fn normalize_key_data(mut key_data: Vec<u8>) -> Vec<u8> {
         // Remove leading zero bytes (padding)
         while !key_data.is_empty() && key_data[0] == 0x00 {
             key_data.remove(0);
@@ -221,7 +222,7 @@ impl<'a> _OwnedCertificate {
     }
 
     /// Normalize EC point data by handling various point formats
-    fn _normalize_ec_point(mut point_data: Vec<u8>) -> Vec<u8> {
+    fn normalize_ec_point(mut point_data: Vec<u8>) -> Vec<u8> {
         // Remove leading zero bytes
         while !point_data.is_empty() && point_data[0] == 0x00 {
             point_data.remove(0);
@@ -279,20 +280,20 @@ impl<'a> _OwnedCertificate {
     }
 }
 
-impl _LdifParser {
-    pub fn _new() -> Self {
+impl LdifParser {
+    pub fn new() -> Self {
         Self {
             pkd_regex: Regex::new(r"(?s)pkdMasterListContent:: (.*?)\n\n").unwrap(),
         }
     }
 
-    pub fn _parse(&'_ self, data: &[u8]) -> Result<Vec<X509Certificate<'_>>, RarimeError> {
+    pub fn parse(&'_ self, data: &[u8]) -> Result<Vec<X509Certificate<'_>>, RarimeError> {
         let content = str::from_utf8(data)?;
-        self._parse_string(content)
+        self.parse_string(content)
     }
 
-    pub fn _parse_string(&'_ self, content: &str) -> Result<Vec<X509Certificate<'_>>, RarimeError> {
-        let owned_certs = self._parse_to_owned_certificates(content)?;
+    pub fn parse_string(&'_ self, content: &str) -> Result<Vec<X509Certificate<'_>>, RarimeError> {
+        let owned_certs = self.parse_to_owned_certificates(content)?;
         let mut certificates = Vec::new();
 
         for owned_cert in owned_certs {
@@ -312,10 +313,10 @@ impl _LdifParser {
         Ok(certificates)
     }
 
-    pub fn _parse_to_owned_certificates(
+    pub fn parse_to_owned_certificates(
         &self,
         content: &str,
-    ) -> Result<Vec<_OwnedCertificate>, RarimeError> {
+    ) -> Result<Vec<OwnedCertificate>, RarimeError> {
         let mut all_certificates = Vec::new();
 
         // Find all pkdMasterListContent entries - each match is a master list
@@ -338,7 +339,7 @@ impl _LdifParser {
                 // );
 
                 // Parse this PKD entry as a master list
-                match self._parse_pkd_entry(&decoded) {
+                match self.parse_pkd_entry(&decoded) {
                     Ok(master_list) => {
                         master_lists.push(master_list);
                     }
@@ -352,7 +353,7 @@ impl _LdifParser {
         // Convert all master lists to owned certificates
         for master_list in master_lists {
             for cert_data in master_list.cert_list {
-                match _OwnedCertificate::_from_der(cert_data) {
+                match OwnedCertificate::from_der(cert_data) {
                     Ok(cert) => all_certificates.push(cert),
                     Err(e) => eprintln!("Warning: Failed to create certificate from DER: {}", e),
                 }
@@ -366,13 +367,13 @@ impl _LdifParser {
         Ok(all_certificates)
     }
 
-    fn _parse_pkd_entry(&self, data: &[u8]) -> Result<_MasterList, RarimeError> {
+    fn parse_pkd_entry(&self, data: &[u8]) -> Result<MasterList, RarimeError> {
         // Try to parse as strict DER first
-        match self._parse_pkd_entry_der(data) {
+        match self.parse_pkd_entry_der(data) {
             Ok(master_list) => Ok(master_list),
             Err(der_error) => {
                 // If DER parsing fails, try BER parsing as fallback
-                match self._parse_pkd_entry_ber(data) {
+                match self.parse_pkd_entry_ber(data) {
                     Ok(master_list) => Ok(master_list),
                     Err(ber_error) => {
                         // If both fail, return the original DER error
@@ -386,7 +387,7 @@ impl _LdifParser {
         }
     }
 
-    fn _parse_pkd_entry_der(&self, data: &[u8]) -> Result<_MasterList, RarimeError> {
+    fn parse_pkd_entry_der(&self, data: &[u8]) -> Result<MasterList, RarimeError> {
         // Parse the ContentInfo structure
         let content_info = ContentInfo::from_der(data)
             .map_err(|e| RarimeError::DerError(format!("Failed to parse ContentInfo: {}", e)))?;
@@ -408,7 +409,7 @@ impl _LdifParser {
             })?;
 
             // Parse the ASN.1 structure to extract the master list
-            let master_list = self._parse_encap_data_with_asn1(&encap_data)?;
+            let master_list = self.parse_encap_data_with_asn1(&encap_data)?;
 
             Ok(master_list)
         } else {
@@ -418,7 +419,7 @@ impl _LdifParser {
         }
     }
 
-    fn _parse_pkd_entry_ber(&self, data: &[u8]) -> Result<_MasterList, RarimeError> {
+    fn parse_pkd_entry_ber(&self, data: &[u8]) -> Result<MasterList, RarimeError> {
         // For BER encoded data, we need to manually parse the structure
         // This is a simplified approach that looks for certificates directly in the data
         use ::der_parser::ber::parse_ber_sequence;
@@ -427,7 +428,7 @@ impl _LdifParser {
         match parse_ber_sequence(data) {
             Ok((_, _)) => {
                 // Look for embedded certificates in the parsed structure
-                let master_list = self._extract_certificates_from_ber_data(data)?;
+                let master_list = self.extract_certificates_from_ber_data(data)?;
                 Ok(master_list)
             }
             Err(e) => Err(RarimeError::DerError(format!(
@@ -437,7 +438,7 @@ impl _LdifParser {
         }
     }
 
-    fn _extract_certificates_from_ber_data(&self, data: &[u8]) -> Result<_MasterList, RarimeError> {
+    fn extract_certificates_from_ber_data(&self, data: &[u8]) -> Result<MasterList, RarimeError> {
         // Scan through the data looking for certificate patterns
         let mut cert_list = Vec::new();
         let mut pos = 0;
@@ -446,7 +447,7 @@ impl _LdifParser {
         while pos < data.len() {
             if pos + 4 < data.len() && data[pos] == 0x30 {
                 // Found a potential certificate (SEQUENCE)
-                if let Some(cert_der) = self._extract_certificate_at_position(data, pos) {
+                if let Some(cert_der) = self.extract_certificate_at_position(data, pos) {
                     // Validate it's actually a certificate
                     if let Ok((_, _)) = X509Certificate::from_der(&cert_der) {
                         let cert_len = cert_der.len();
@@ -467,10 +468,10 @@ impl _LdifParser {
             return Err(RarimeError::NoCertificatesFound);
         }
 
-        Ok(_MasterList { version, cert_list })
+        Ok(MasterList { version, cert_list })
     }
 
-    fn _parse_encap_data_with_asn1(&self, data: &[u8]) -> Result<_MasterList, RarimeError> {
+    fn parse_encap_data_with_asn1(&self, data: &[u8]) -> Result<MasterList, RarimeError> {
         // The encapsulated data might be wrapped in an OCTET STRING
         let actual_data = if data.len() > 2 && data[0] == 0x04 {
             // OCTET STRING tag (0x04)
@@ -553,7 +554,7 @@ impl _LdifParser {
         while pos < actual_data.len() {
             if actual_data[pos] == 0x30 {
                 // Found a potential certificate (SEQUENCE)
-                if let Some(cert_der) = self._extract_certificate_at_position(actual_data, pos) {
+                if let Some(cert_der) = self.extract_certificate_at_position(actual_data, pos) {
                     // Validate it's actually a certificate
                     if let Ok((_, _)) = X509Certificate::from_der(&cert_der) {
                         let cert_len = cert_der.len();
@@ -570,10 +571,10 @@ impl _LdifParser {
             }
         }
 
-        Ok(_MasterList { version, cert_list })
+        Ok(MasterList { version, cert_list })
     }
 
-    fn _extract_certificate_at_position(&self, data: &[u8], pos: usize) -> Option<Vec<u8>> {
+    fn extract_certificate_at_position(&self, data: &[u8], pos: usize) -> Option<Vec<u8>> {
         if pos + 2 >= data.len() {
             return None;
         }
@@ -609,21 +610,21 @@ impl _LdifParser {
     }
 }
 
-pub struct _PemParser;
+pub struct PemParser;
 
-impl _PemParser {
-    pub fn _new() -> Self {
+impl PemParser {
+    pub fn new() -> Self {
         Self
     }
 
     /// Parse PEM-encoded certificates from bytes
-    pub fn _parse(&self, data: &[u8]) -> Result<Vec<_OwnedCertificate>, RarimeError> {
+    pub fn parse(&self, data: &[u8]) -> Result<Vec<OwnedCertificate>, RarimeError> {
         let content = str::from_utf8(data)?;
-        self._parse_string(content)
+        self.parse_string(content)
     }
 
     /// Parse PEM-encoded certificates from a string
-    pub fn _parse_string(&self, content: &str) -> Result<Vec<_OwnedCertificate>, RarimeError> {
+    pub fn parse_string(&self, content: &str) -> Result<Vec<OwnedCertificate>, RarimeError> {
         let pem_objects = ::pem::parse_many(content)
             .map_err(|e| RarimeError::PemError(format!("Failed to parse PEM data: {}", e)))?;
 
@@ -636,7 +637,7 @@ impl _PemParser {
                 let der_data = pem_obj.contents().to_vec();
 
                 // Validate that this is a valid certificate
-                match _OwnedCertificate::_from_der(der_data) {
+                match OwnedCertificate::from_der(der_data) {
                     Ok(cert) => certificates.push(cert),
                     Err(e) => {
                         eprintln!("Warning: Failed to parse certificate from PEM: {}", e);
@@ -653,14 +654,14 @@ impl _PemParser {
     }
 }
 
-impl Default for _LdifParser {
+impl Default for LdifParser {
     fn default() -> Self {
-        Self::_new()
+        Self::new()
     }
 }
 
-impl Default for _PemParser {
+impl Default for PemParser {
     fn default() -> Self {
-        Self::_new()
+        Self::new()
     }
 }
