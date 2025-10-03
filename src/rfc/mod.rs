@@ -68,10 +68,7 @@ impl<'a> TeletexString<'a> {
     }
 
     fn new_from_bytes(s: &'a [u8]) -> Option<TeletexString<'a>> {
-        let string = match core::str::from_utf8(s).ok() {
-            Some(string) => string,
-            None => return None,
-        };
+        let string = core::str::from_utf8(s).ok()?;
 
         Some(TeletexString(string))
     }
@@ -108,10 +105,7 @@ impl<'a> IA5String<'a> {
     }
 
     fn new_from_bytes(s: &'a [u8]) -> Option<IA5String<'a>> {
-        let string = match core::str::from_utf8(s).ok() {
-            Some(string) => string,
-            None => return None,
-        };
+        let string = core::str::from_utf8(s).ok()?;
 
         Some(IA5String(string))
     }

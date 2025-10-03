@@ -29,3 +29,8 @@ cms = "0.2.3"
 x509-parser = "0.18.0"
 der-parser = "10.0.0"
 babyjubjub-rs = { version = "0.0.11", features = ["aarch64"] }
+simple_asn1 = "0.6.3"
+poseidon-rs = "0.0.10"
+ff = { package = "ff_ce", version = "0.11", features = ["derive"] }
+contracts = { path = "src/contracts" }
+tokio = "1.47.1"

@@ -31,7 +31,7 @@ pub struct Passport {
     pub sod: Vec<u8>,
 }
 
-impl Passport {
+impl<'a> Passport {
     pub fn new(
         dg1: Vec<u8>,
         dg15: Option<Vec<u8>>,
@@ -48,7 +48,7 @@ impl Passport {
         }
     }
 
-    pub fn parse_signed_data(&self) -> Result<SignedData, RarimeError> {
+    pub fn parse_signed_data(&'a self) -> Result<SignedData<'a>, RarimeError> {
         Ok(asn1::parse_single::<SignedData>(&self.sod[23..])?)
     }
 }

@@ -1,6 +1,5 @@
 /target
 /tests/assets/test_passport.json
-/tests/assets/passports/*
 
 .idea/
 .vscode/

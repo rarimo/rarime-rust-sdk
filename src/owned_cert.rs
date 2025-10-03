@@ -1,3 +1,4 @@
+#![allow(unused)]
 use crate::RarimeError;
 use base64::{Engine as _, engine::general_purpose};
 use cms::content_info::ContentInfo;
@@ -26,7 +27,7 @@ pub struct OwnedCertificate {
     der_data: Vec<u8>,
 }
 
-impl OwnedCertificate {
+impl<'a> OwnedCertificate {
     pub fn from_der(der_data: Vec<u8>) -> Result<Self, RarimeError> {
         // Validate that this is a valid certificate
         X509Certificate::from_der(&der_data)
@@ -50,7 +51,7 @@ impl OwnedCertificate {
         Self::from_der(der_data)
     }
 
-    pub fn parse(&self) -> Result<X509Certificate, RarimeError> {
+    pub fn parse(&'a self) -> Result<X509Certificate<'a>, RarimeError> {
         let (_, cert) = X509Certificate::from_der(&self.der_data)
             .map_err(|e| RarimeError::X509Error(format!("Failed to parse certificate: {}", e)))?;
         Ok(cert)
@@ -87,10 +88,10 @@ impl OwnedCertificate {
             let master_cert = candidate.parse()?;
 
             // Get the Subject Key Identifier from the master certificate
-            if let Ok(master_ski) = self.extract_subject_key_identifier(&master_cert) {
-                if slave_aki == master_ski {
-                    return Ok(Some(candidate));
-                }
+            if let Ok(master_ski) = self.extract_subject_key_identifier(&master_cert)
+                && slave_aki == master_ski
+            {
+                return Ok(Some(candidate));
             }
         }
 
@@ -104,12 +105,11 @@ impl OwnedCertificate {
     ) -> Result<Vec<u8>, RarimeError> {
         // Look for Authority Key Identifier extension
         for ext in cert.extensions() {
-            if ext.oid == OID_X509_EXT_AUTHORITY_KEY_IDENTIFIER {
-                if let ParsedExtension::AuthorityKeyIdentifier(aki) = ext.parsed_extension() {
-                    if let Some(key_id) = &aki.key_identifier {
-                        return Ok(key_id.0.to_vec());
-                    }
-                }
+            if ext.oid == OID_X509_EXT_AUTHORITY_KEY_IDENTIFIER
+                && let ParsedExtension::AuthorityKeyIdentifier(aki) = ext.parsed_extension()
+                && let Some(key_id) = &aki.key_identifier
+            {
+                return Ok(key_id.0.to_vec());
             }
         }
 
@@ -125,10 +125,10 @@ impl OwnedCertificate {
     ) -> Result<Vec<u8>, RarimeError> {
         // Look for Subject Key Identifier extension
         for ext in cert.extensions() {
-            if ext.oid == OID_X509_EXT_SUBJECT_KEY_IDENTIFIER {
-                if let ParsedExtension::SubjectKeyIdentifier(ski) = ext.parsed_extension() {
-                    return Ok(ski.0.to_vec());
-                }
+            if ext.oid == OID_X509_EXT_SUBJECT_KEY_IDENTIFIER
+                && let ParsedExtension::SubjectKeyIdentifier(ski) = ext.parsed_extension()
+            {
+                return Ok(ski.0.to_vec());
             }
         }
 
@@ -155,7 +155,7 @@ impl OwnedCertificate {
         let raw_key = match parsed_public_key {
             PublicKey::RSA(rsa_key) => {
                 // Extract RSA modulus and normalize it
-                let modulus: Vec<u8> = rsa_key.modulus.iter().cloned().collect::<Vec<u8>>();
+                let modulus: Vec<u8> = rsa_key.modulus.to_vec();
                 Self::normalize_key_data(modulus)
             }
             PublicKey::EC(ec_point) => {
@@ -239,7 +239,7 @@ impl OwnedCertificate {
 
             // For uncompressed points, the data is X || Y coordinates
             // Each coordinate might have leading zeros that need normalization
-            if point_data.len() % 2 == 0 {
+            if point_data.len().is_multiple_of(2) {
                 let coord_len = point_data.len() / 2;
                 let mut x_coord = point_data[..coord_len].to_vec();
                 let mut y_coord = point_data[coord_len..].to_vec();
@@ -287,12 +287,12 @@ impl LdifParser {
         }
     }
 
-    pub fn parse(&self, data: &[u8]) -> Result<Vec<X509Certificate>, RarimeError> {
+    pub fn parse(&'_ self, data: &[u8]) -> Result<Vec<X509Certificate<'_>>, RarimeError> {
         let content = str::from_utf8(data)?;
         self.parse_string(content)
     }
 
-    pub fn parse_string(&self, content: &str) -> Result<Vec<X509Certificate>, RarimeError> {
+    pub fn parse_string(&'_ self, content: &str) -> Result<Vec<X509Certificate<'_>>, RarimeError> {
         let owned_certs = self.parse_to_owned_certificates(content)?;
         let mut certificates = Vec::new();
 

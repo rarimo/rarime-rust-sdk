@@ -1,3 +1,4 @@
+#![allow(unused)]
 use crate::RarimeError;
 use crate::owned_cert::OwnedCertificate;
 use num_bigint::BigUint;
@@ -54,7 +55,7 @@ impl Treap {
         let priority = key_hash_bigint % max_u64_minus_1;
 
         // Convert back to u64
-        priority.to_u64_digits().get(0).copied().unwrap_or(0)
+        priority.to_u64_digits().first().copied().unwrap_or(0)
     }
 
     fn compare_bytes(a: &[u8], b: &[u8]) -> Ordering {
@@ -354,10 +355,7 @@ impl CertTree {
         let cert_hash = Self::keccak256(&public_key);
         let merkle_path = self.tree.merkle_path(&cert_hash);
 
-        let siblings = merkle_path
-            .into_iter()
-            .map(|hash| hex::encode(hash))
-            .collect();
+        let siblings = merkle_path.into_iter().map(hex::encode).collect();
 
         Ok(Proof::new(siblings))
     }

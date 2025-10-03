@@ -3,12 +3,87 @@ pub mod passport;
 pub mod rfc;
 
 mod base64;
+mod document;
 mod owned_cert;
 mod treap_tree;
 mod utils;
 
+#[derive(Debug, Clone)]
+pub struct RarimeUserConfiguration {
+    pub user_private_key: Option<[u8; 32]>,
+}
+#[derive(Debug, Clone)]
+pub struct RarimeAPIConfiguration {
+    pub json_rpc_evm_url: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct RarimeContractsConfiguration {
+    pub state_keeper_contract_address: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct RarimeConfiguration {
+    pub contracts_configuration: RarimeContractsConfiguration,
+    pub api_configuration: RarimeAPIConfiguration,
+    pub user_configuration: RarimeUserConfiguration,
+}
+
+pub struct Rarime {
+    config: RarimeConfiguration,
+}
+
+impl Rarime {
+    pub fn new(config: RarimeConfiguration) -> Self {
+        Self { config }
+    }
+
+    pub async fn get_identity_status(
+        &mut self,
+        passport: &RarimePassport,
+    ) -> Result<DocumentStatus, RarimeError> {
+        let config = ContractsProviderConfig {
+            rpc_url: self.config.api_configuration.json_rpc_evm_url.clone(),
+            state_keeper_contract_address: self
+                .config
+                .contracts_configuration
+                .state_keeper_contract_address
+                .clone(),
+        };
+        let private_key: [u8; 32] = match self.config.user_configuration.user_private_key.clone() {
+            Some(key) => key,
+            None => {
+                let new_key = RarimeUtils::generate_bjj_private_key()?;
+                self.config.user_configuration.user_private_key = Some(new_key);
+                new_key
+            }
+        };
+        let profile_key = get_profile_key(&private_key)?;
+
+        let passport_key = passport.get_passport_key()?;
+
+        let result = get_document_status(&passport_key, &profile_key, config).await?;
+
+        Ok(result)
+    }
+}
+
+pub struct RarimeUtils {}
+
+impl RarimeUtils {
+    pub fn generate_bjj_private_key() -> Result<[u8; 32], RarimeError> {
+        return rarime_utils::generate_bjj_private_key();
+    }
+}
+
+pub use crate::document::DocumentStatus;
+use crate::document::get_document_status;
+use crate::utils::get_profile_key;
 use ::base64::DecodeError;
+use contracts::{ContractsError, ContractsProviderConfig};
+pub use document::RarimePassport;
 use thiserror::Error;
+pub use utils::rarime_utils;
 
 #[derive(Error, Debug)]
 pub enum RarimeError {
@@ -28,8 +103,32 @@ pub enum RarimeError {
     NoCertificatesFound,
     #[error("UTF-8 error: {0}")]
     UTF8Error(#[from] std::str::Utf8Error),
-    #[error("decoding error: {0}")]
+    #[error("Decoding error: {0}")]
     DecodeError(#[from] DecodeError),
     #[error("Der error: {0}")]
     DerError(String),
+    #[error("Unsupported type of public key")]
+    UnsupportedPassportKey,
+    #[error("Parsing DG15 error: {0}")]
+    ParseDg15Error(String),
+    #[error("Get passport key error: {0}")]
+    GetPassportKeyError(String),
+    #[error("Generate private key error")]
+    GeneratePrivateKeyError,
+    #[error("Poseidon error: {0}")]
+    PoseidonHashError(String),
+    #[error("Contract error: {0}")]
+    ContractCallError(#[from] ContractsError),
+    #[error("{0}")]
+    ASN1RouteError(String),
+    #[error("Empty DER data: expected at least one block")]
+    EmptyDer,
+    #[error("Decoding ASN1 error: {0}")]
+    ASN1DecodeError(#[from] simple_asn1::ASN1DecodeErr),
+    #[error("Encoding ASN1 error: {0}")]
+    ASN1EncodeError(#[from] simple_asn1::ASN1EncodeErr),
+    #[error(transparent)]
+    ContractError(ContractsError),
+    #[error("OID operation error: {0}")]
+    OIDError(const_oid::Error),
 }
