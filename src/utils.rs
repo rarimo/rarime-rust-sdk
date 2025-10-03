@@ -81,11 +81,11 @@ pub fn get_profile_key(private_key: &[u8; 32]) -> Result<[u8; 32], RarimeError> 
         x: babyjubjub_rs::Fr::from_str(
             "5299619240641551281634865583518297030282874472190772894086521144482721001553",
         )
-        .unwrap(),
+        .expect("Failed to init Generator point"),
         y: babyjubjub_rs::Fr::from_str(
             "16950150798460657717958625567821834550301663161624707787222815936182638968203",
         )
-        .unwrap(),
+        .expect("Failed to init Generator point"),
     };
     let pub_point = b8.mul_scalar(&scalar_int);
     let mut x_raw_bytes = Vec::new();
