@@ -101,6 +101,7 @@ use crate::utils::get_profile_key;
 use ::base64::DecodeError;
 use contracts::{ContractsError, ContractsProviderConfig};
 pub use document::RarimePassport;
+use proofs::ProofError;
 use thiserror::Error;
 pub use utils::rarime_utils;
 
@@ -150,4 +151,6 @@ pub enum RarimeError {
     ContractError(ContractsError),
     #[error("OID operation error: {0}")]
     OIDError(const_oid::Error),
+    #[error("Generate proof error: {0}")]
+    ProveError(#[from] ProofError),
 }
