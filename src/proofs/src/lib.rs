@@ -24,7 +24,7 @@ impl ProofProvider {
         Self { inputs, hash_size }
     }
 
-    pub fn get_register_proof(&self) -> Result<Vec<u8>, ProofError> {
+    pub fn generate_lite_proof(&self) -> Result<Vec<u8>, ProofError> {
         let path = format!(
             "src/assets/register_lite_{}.json",
             self.hash_size.to_string()
@@ -58,6 +58,8 @@ impl ProofProvider {
         let initial_witness = from_vec_str_to_witness_map(witness_input_refs.clone())
             .map_err(|e| ProofError::Witness(e))?;
 
+        // HACK: This function actually generates an Ultra Honk proof,
+        // despite the misleading 'ultra_plonk' name
         let (proof, _) = prove_ultra_plonk(bytecode, initial_witness, false)
             .map_err(|e| ProofError::ProvingError(e))?;
 
