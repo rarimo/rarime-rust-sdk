@@ -182,7 +182,7 @@ impl RarimePassport {
         let sign_attr: ASN1Block = Self::extract_signed_attributes(sod)?;
 
         let hash_algorithm = RarimePassport::extract_passport_hash_algorithm(sod)?;
-        let parsed_hash_algorithm = RarimePassport::parse_passport_hash_algorithm(&hash_algorithm)?;
+        let parsed_hash_algorithm = RarimePassport::parse_hash_algorithm(&hash_algorithm)?;
 
         let mut sign_attr_bytes =
             to_der(&sign_attr).map_err(|e| RarimeError::DerError(e.to_string()))?;
@@ -612,7 +612,7 @@ impl RarimePassport {
         Ok(sig_alg_block)
     }
 
-    fn parse_dg_group_hash_size(oid_block: &ASN1Block) -> Result<HashAlgorithm, RarimeError> {
+    fn parse_hash_algorithm(oid_block: &ASN1Block) -> Result<HashAlgorithm, RarimeError> {
         let oid: ObjectIdentifier = if let ASN1Block::ObjectIdentifier(_, raw_oid) = oid_block {
             ObjectIdentifier::from_bytes(
                 &raw_oid
@@ -627,47 +627,21 @@ impl RarimePassport {
         };
 
         match oid {
-            ID_SHA_1 => Ok(HashAlgorithm::SHA1),
-            ID_SHA_224 => Ok(HashAlgorithm::SHA224),
-            ID_SHA_256 => Ok(HashAlgorithm::SHA256),
-            ID_SHA_384 => Ok(HashAlgorithm::SHA384),
-            ID_SHA_512 => Ok(HashAlgorithm::SHA512),
+            ID_SHA_1 | SHA_1_WITH_RSA_ENCRYPTION => Ok(HashAlgorithm::SHA1),
+            ID_SHA_224 | SHA_224_WITH_RSA_ENCRYPTION => Ok(HashAlgorithm::SHA224),
+            ID_SHA_256 | SHA_256_WITH_RSA_ENCRYPTION => Ok(HashAlgorithm::SHA256),
+            ID_SHA_384 | SHA_384_WITH_RSA_ENCRYPTION => Ok(HashAlgorithm::SHA384),
+            ID_SHA_512 | SHA_512_WITH_RSA_ENCRYPTION => Ok(HashAlgorithm::SHA512),
             _ => Err(RarimeError::ASN1RouteError(
                 "Not supported ObjectIdentifier".to_string(),
             )),
         }
     }
 
-    fn parse_passport_hash_algorithm(oid_block: &ASN1Block) -> Result<HashAlgorithm, RarimeError> {
-        let oid: ObjectIdentifier = if let ASN1Block::ObjectIdentifier(_, raw_oid) = oid_block {
-            ObjectIdentifier::from_bytes(
-                &raw_oid
-                    .as_raw()
-                    .map_err(|e| RarimeError::ASN1EncodeError(e))?,
-            )
-            .map_err(|e| RarimeError::OIDError(e))?
-        } else {
-            return Err(RarimeError::ASN1RouteError(
-                "Expected ObjectIdentifier block".to_string(),
-            ));
-        };
-
-        match oid {
-            SHA_1_WITH_RSA_ENCRYPTION => Ok(HashAlgorithm::SHA1),
-            SHA_224_WITH_RSA_ENCRYPTION => Ok(HashAlgorithm::SHA224),
-            SHA_256_WITH_RSA_ENCRYPTION => Ok(HashAlgorithm::SHA256),
-            SHA_384_WITH_RSA_ENCRYPTION => Ok(HashAlgorithm::SHA384),
-            SHA_512_WITH_RSA_ENCRYPTION => Ok(HashAlgorithm::SHA512),
-            _ => Err(RarimeError::ASN1RouteError(
-                "Not supported ObjectIdentifier".to_string(),
-            )),
-        }
-    }
-
-    pub fn get_register_proof(&self, profile_key: &[u8; 32]) -> Result<Vec<u8>, RarimeError> {
+    pub fn prove_dg1(&self, profile_key: &[u8; 32]) -> Result<Vec<u8>, RarimeError> {
         let dg_algo = &self.extract_dg_hash_algo()?;
 
-        let parsed_hash_algo = RarimePassport::parse_dg_group_hash_size(&dg_algo)?;
+        let parsed_hash_algo = RarimePassport::parse_hash_algorithm(&dg_algo)?;
 
         let proof_inputs = ProofInput {
             dg1_commitment: Vec::from(self.extract_dg1_commitment(profile_key)?),
@@ -676,7 +650,7 @@ impl RarimePassport {
         };
 
         let proof_provider = ProofProvider::new(proof_inputs, parsed_hash_algo.get_byte_length());
-        let register_proof = proof_provider.get_register_proof()?;
+        let register_proof = proof_provider.generate_lite_proof()?;
         return Ok(register_proof);
     }
 }

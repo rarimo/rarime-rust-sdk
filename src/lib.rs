@@ -50,6 +50,7 @@ impl Rarime {
                 .state_keeper_contract_address
                 .clone(),
         };
+
         let private_key: [u8; 32] = match self.config.user_configuration.user_private_key.clone() {
             Some(key) => key,
             None => {
@@ -58,6 +59,7 @@ impl Rarime {
                 new_key
             }
         };
+
         let profile_key = get_profile_key(&private_key)?;
 
         let passport_key = passport.get_passport_key()?;
@@ -79,9 +81,10 @@ impl Rarime {
                 new_key
             }
         };
+
         let profile_key = get_profile_key(&private_key)?;
 
-        let result = passport.get_register_proof(&profile_key)?;
+        let result = passport.prove_dg1(&profile_key)?;
 
         Ok(result)
     }
