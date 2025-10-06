@@ -8,19 +8,19 @@ use thiserror::Error;
 
 mod utils;
 
-pub struct ProofInput {
+pub struct LiteProofInput {
     pub dg1_commitment: Vec<u8>,
     pub dg1_hash: Vec<u8>,
     pub profile_key: Vec<u8>,
 }
 
 pub struct ProofProvider {
-    inputs: ProofInput,
+    inputs: LiteProofInput,
     hash_size: usize,
 }
 
 impl ProofProvider {
-    pub fn new(inputs: ProofInput, hash_size: usize) -> Self {
+    pub fn new(inputs: LiteProofInput, hash_size: usize) -> Self {
         Self { inputs, hash_size }
     }
 

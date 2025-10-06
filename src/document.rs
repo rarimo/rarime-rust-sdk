@@ -12,8 +12,8 @@ use digest::Digest;
 use ff::{PrimeField, PrimeFieldRepr};
 use num_bigint::BigInt;
 use num_traits::{One, Zero};
-use poseidon_rs::Fr;
-use proofs::{ProofInput, ProofProvider};
+use poseidon_rs::{Fr, Poseidon};
+use proofs::{LiteProofInput, ProofProvider};
 use sha1::Sha1;
 use sha2::{Sha224, Sha256, Sha384, Sha512};
 use simple_asn1::{ASN1Block, ASN1Class, BigUint, from_der, to_der};
@@ -114,9 +114,21 @@ impl RarimePassport {
         Ok(passport_key)
     }
 
+    /// Extracts and computes a cryptographic commitment from `data_group1`
+    /// using the provided secret identity key `sk_identity`.
+    ///
+    /// # Description
+    /// This function performs the following steps:
+    /// 1. Splits the binary data in `data_group1` into 4 chunks.
+    /// 2. Each chunk is interpreted as a large integer (`BigInt`) built bit by bit.
+    /// 3. Each of these four big integers is converted into a field element.
+    /// 4. The `sk_identity` (32-byte private key) is also converted into an `Fr` element.
+    /// 5. The private key is hashed using the Poseidon hash function, and the resulting field element
+    ///    is appended to the list of field elements.
+    /// 6. All collected field elements are then hashed again using Poseidon to produce the final commitment.
+    /// 7. The resulting field element is converted back into a 32-byte array and returned.
+    ///
     pub fn extract_dg1_commitment(&self, sk_identity: &[u8; 32]) -> Result<[u8; 32], RarimeError> {
-        let poseidon_hasher = poseidon_rs::Poseidon::new();
-
         let chunk_len = &self.data_group1.len() * 2;
         let mut vec_fr = vec![];
 
@@ -157,8 +169,10 @@ impl RarimePassport {
             .expect("error convert BigInt to Fr ");
 
         let sk_fr = Fr::from_repr(repr).expect("error converting Repr to Fr");
-        let poseidon_hasher_2 = poseidon_rs::Poseidon::new();
-        let inner = poseidon_hasher_2
+
+        let poseidon_hasher = Poseidon::new();
+
+        let inner = poseidon_hasher
             .hash(vec![sk_fr])
             .map_err(PoseidonHashError)?;
         vec_fr.push(inner);
@@ -175,6 +189,7 @@ impl RarimePassport {
         let result_big_int = BigInt::from_bytes_be(num_bigint::Sign::Plus, &raw_hash_bytes);
 
         let big_int_32 = big_int_to_32_bytes(&result_big_int);
+
         return Ok(big_int_32);
     }
 
@@ -643,7 +658,7 @@ impl RarimePassport {
 
         let parsed_hash_algo = RarimePassport::parse_hash_algorithm(&dg_algo)?;
 
-        let proof_inputs = ProofInput {
+        let proof_inputs = LiteProofInput {
             dg1_commitment: Vec::from(self.extract_dg1_commitment(profile_key)?),
             dg1_hash: Vec::from(parsed_hash_algo.get_hash_fixed32(&self.data_group1)),
             profile_key: Vec::from(profile_key),
