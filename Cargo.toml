@@ -35,3 +35,6 @@ ff = { package = "ff_ce", version = "0.11", features = ["derive"] }
 contracts = { path = "src/contracts" }
 proofs = { path = "src/proofs" }
 tokio = "1.47.1"
+
+[patch.crates-io]
+proptest = { git = "https://github.com/proptest-rs/proptest", tag = "v1.6.0" }
