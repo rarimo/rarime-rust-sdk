@@ -11,15 +11,15 @@ mod utils;
 pub struct ProofInput {
     pub dg1_commitment: Vec<u8>,
     pub dg1_hash: Vec<u8>,
-    pub sk_hash: Vec<u8>,
+    pub profile_key: Vec<u8>,
 }
 
-pub struct Proof {
+pub struct ProofProvider {
     inputs: ProofInput,
     hash_size: usize,
 }
 
-impl Proof {
+impl ProofProvider {
     pub fn new(inputs: ProofInput, hash_size: usize) -> Self {
         Self { inputs, hash_size }
     }
@@ -48,7 +48,7 @@ impl Proof {
 
         witness_inputs.extend(bytes_to_string_array(&self.inputs.dg1_commitment)); // dg1_commitment
         witness_inputs.extend(bytes_to_string_array(&self.inputs.dg1_hash)); // dg1_hash
-        witness_inputs.extend(bytes_to_string_array(&self.inputs.sk_hash)); // sk_hash
+        witness_inputs.extend(bytes_to_string_array(&self.inputs.profile_key)); // sk_hash
 
         let witness_input_refs = witness_inputs
             .iter()

@@ -66,6 +66,25 @@ impl Rarime {
 
         Ok(result)
     }
+
+    pub fn get_register_proof(
+        &mut self,
+        passport: &RarimePassport,
+    ) -> Result<Vec<u8>, RarimeError> {
+        let private_key: [u8; 32] = match self.config.user_configuration.user_private_key.clone() {
+            Some(key) => key,
+            None => {
+                let new_key = RarimeUtils::generate_bjj_private_key()?;
+                self.config.user_configuration.user_private_key = Some(new_key);
+                new_key
+            }
+        };
+        let profile_key = get_profile_key(&private_key)?;
+
+        let result = passport.get_register_proof(&profile_key)?;
+
+        Ok(result)
+    }
 }
 
 pub struct RarimeUtils {}

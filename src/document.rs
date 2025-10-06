@@ -13,6 +13,7 @@ use ff::{PrimeField, PrimeFieldRepr};
 use num_bigint::BigInt;
 use num_traits::{One, Zero};
 use poseidon_rs::Fr;
+use proofs::{ProofInput, ProofProvider};
 use sha1::Sha1;
 use sha2::{Sha224, Sha256, Sha384, Sha512};
 use simple_asn1::{ASN1Block, ASN1Class, BigUint, from_der, to_der};
@@ -113,7 +114,7 @@ impl RarimePassport {
         Ok(passport_key)
     }
 
-    pub fn extract_dg1_commitment(&self, sk_identity: &BigInt) -> Result<[u8; 32], RarimeError> {
+    pub fn extract_dg1_commitment(&self, sk_identity: &[u8; 32]) -> Result<[u8; 32], RarimeError> {
         let poseidon_hasher = poseidon_rs::Poseidon::new();
 
         let chunk_len = &self.data_group1.len() * 2;
@@ -148,17 +149,18 @@ impl RarimePassport {
                 .expect("error convert BigInt to Fr ");
             vec_fr.push(Fr::from_repr(repr).expect("error converting repr to Fr"));
         }
-        let bytes = big_int_to_32_bytes(sk_identity);
 
         let mut repr = poseidon_rs::FrRepr::default();
 
-        let mut cursor = Cursor::new(&bytes);
+        let mut cursor = Cursor::new(&sk_identity);
         repr.read_be(&mut cursor)
             .expect("error convert BigInt to Fr ");
 
         let sk_fr = Fr::from_repr(repr).expect("error converting Repr to Fr");
         let poseidon_hasher_2 = poseidon_rs::Poseidon::new();
-        let inner = poseidon_hasher_2.hash(vec![sk_fr]).unwrap();
+        let inner = poseidon_hasher_2
+            .hash(vec![sk_fr])
+            .map_err(PoseidonHashError)?;
         vec_fr.push(inner);
 
         let hash_result: Fr = poseidon_hasher.hash(vec_fr).map_err(PoseidonHashError)?;
@@ -262,7 +264,8 @@ impl RarimePassport {
         Ok(poseidon_result)
     }
 
-    fn extract_dg_hash_algo(sod_bytes: &[u8]) -> Result<ASN1Block, RarimeError> {
+    pub fn extract_dg_hash_algo(&self) -> Result<ASN1Block, RarimeError> {
+        let sod_bytes = &self.sod;
         let blocks = from_der(sod_bytes).map_err(|e| RarimeError::DerError(e.to_string()))?;
 
         let app23_block = blocks
@@ -608,7 +611,8 @@ impl RarimePassport {
 
         Ok(sig_alg_block)
     }
-    fn parse_dg_group_hash_size(oid_block: ASN1Block) -> Result<HashAlgorithm, RarimeError> {
+
+    fn parse_dg_group_hash_size(oid_block: &ASN1Block) -> Result<HashAlgorithm, RarimeError> {
         let oid: ObjectIdentifier = if let ASN1Block::ObjectIdentifier(_, raw_oid) = oid_block {
             ObjectIdentifier::from_bytes(
                 &raw_oid
@@ -658,5 +662,21 @@ impl RarimePassport {
                 "Not supported ObjectIdentifier".to_string(),
             )),
         }
+    }
+
+    pub fn get_register_proof(&self, profile_key: &[u8; 32]) -> Result<Vec<u8>, RarimeError> {
+        let dg_algo = &self.extract_dg_hash_algo()?;
+
+        let parsed_hash_algo = RarimePassport::parse_dg_group_hash_size(&dg_algo)?;
+
+        let proof_inputs = ProofInput {
+            dg1_commitment: Vec::from(self.extract_dg1_commitment(profile_key)?),
+            dg1_hash: Vec::from(parsed_hash_algo.get_hash_fixed32(&self.data_group1)),
+            profile_key: Vec::from(profile_key),
+        };
+
+        let proof_provider = ProofProvider::new(proof_inputs, parsed_hash_algo.get_byte_length());
+        let register_proof = proof_provider.get_register_proof()?;
+        return Ok(register_proof);
     }
 }
