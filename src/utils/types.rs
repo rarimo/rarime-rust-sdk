@@ -1,5 +1,6 @@
 use serde::Serialize;
 
+//request types
 #[derive(Serialize, Debug)]
 pub struct Proof {
     pub proof: Vec<u8>,
@@ -20,6 +21,7 @@ pub struct DocumentSod {
     pub aa_signature: String,
     pub pem_file: String,
     pub dg15: String,
+    pub sod: String,
 }
 
 #[derive(Serialize, Debug)]
@@ -36,4 +38,29 @@ pub struct Data {
 #[derive(Serialize, Debug)]
 pub struct PostRequest {
     pub data: Data,
+}
+
+//response types
+
+use serde::Deserialize;
+
+#[derive(Deserialize, Debug)]
+pub struct LightRegistrationData {
+    pub passport_hash: String,
+    pub public_key: String,
+    pub signature: String,
+    pub verifier: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct VerifySodResponseData {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub type_name: String,
+    pub attributes: LightRegistrationData,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct VerifySodResponse {
+    pub data: VerifySodResponseData,
 }
