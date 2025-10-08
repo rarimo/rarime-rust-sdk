@@ -1,14 +1,10 @@
 use serde::{Deserialize, Serialize};
 
 //request types
-#[derive(Serialize, Debug)]
-pub struct Proof {
-    pub proof: Vec<u8>,
-}
 
 #[derive(Serialize, Debug)]
 pub struct ZkProof {
-    pub proof: Proof,
+    pub proof: Vec<u8>,
 }
 
 #[derive(Serialize, Debug)]
@@ -32,6 +28,9 @@ pub struct Attributes {
 
 #[derive(Serialize, Debug)]
 pub struct Data {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub type_name: String,
     pub attributes: Attributes,
 }
 

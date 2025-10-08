@@ -4,7 +4,9 @@ pub mod rfc;
 
 mod base64;
 mod document;
+mod hash_algorithm;
 mod owned_cert;
+mod signature_algorithm;
 mod treap_tree;
 mod utils;
 
@@ -70,10 +72,7 @@ impl Rarime {
         Ok(result)
     }
 
-    pub fn get_register_proof(
-        &mut self,
-        passport: &RarimePassport,
-    ) -> Result<Vec<u8>, RarimeError> {
+    fn get_register_proof(&mut self, passport: &RarimePassport) -> Result<Vec<u8>, RarimeError> {
         let private_key: [u8; 32] = match self.config.user_configuration.user_private_key.clone() {
             Some(key) => key,
             None => {
@@ -89,6 +88,43 @@ impl Rarime {
 
         Ok(result)
     }
+
+    async fn verify_sod(
+        &mut self,
+        passport: &RarimePassport,
+    ) -> Result<VerifySodResponse, RarimeError> {
+        let api_provider = ApiProvider::new(&self.config.api_configuration.rarime_api_url)?;
+
+        let verify_sod_request = VerifySodRequest {
+            data: Data {
+                id: "".to_string(),
+                type_name: "register".to_string(),
+                attributes: Attributes {
+                    document_sod: DocumentSod {
+                        hash_algorithm: "".to_string(),
+                        signature_algorithm: "".to_string(),
+                        signed_attributes: "".to_string(),
+                        encapsulated_content: "".to_string(),
+                        signature: "".to_string(),
+                        aa_signature: "".to_string(),
+                        pem_file: "".to_string(),
+                        dg15: match &passport.data_group15 {
+                            Some(value) => STANDARD.encode(value),
+                            None => "".to_string(),
+                        },
+                        sod: STANDARD.encode(&passport.sod),
+                    },
+                    zk_proof: ZkProof {
+                        proof: self.get_register_proof(passport)?,
+                    },
+                },
+            },
+        };
+
+        let verify_sod_result = api_provider.verify_sod(&verify_sod_request).await?;
+
+        return Ok(verify_sod_result);
+    }
 }
 
 pub struct RarimeUtils {}
@@ -102,8 +138,13 @@ impl RarimeUtils {
 pub use crate::document::DocumentStatus;
 use crate::document::get_document_status;
 use crate::utils::get_profile_key;
-use ::base64::DecodeError;
+use ::base64::engine::general_purpose::STANDARD;
+use ::base64::{DecodeError, Engine};
+use api::ApiProvider;
 use api::errors::ApiError;
+use api::types::verify_sod::{
+    Attributes, Data, DocumentSod, VerifySodRequest, VerifySodResponse, ZkProof,
+};
 use contracts::{ContractsError, ContractsProviderConfig};
 pub use document::RarimePassport;
 use proofs::ProofError;

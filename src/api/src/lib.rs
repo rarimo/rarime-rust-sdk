@@ -12,7 +12,7 @@ pub struct ApiProvider {
 }
 
 impl ApiProvider {
-    pub fn new(base_url: &str) -> Result<Self, url::ParseError> {
+    pub fn new(base_url: &str) -> Result<Self, ApiError> {
         Ok(ApiProvider {
             client: Client::new(),
             base_url: Url::parse(base_url)?,
