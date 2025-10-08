@@ -1,9 +1,11 @@
 use crate::RarimeError;
 use crate::RarimeError::PoseidonHashError;
+use const_oid::ObjectIdentifier;
 use ff::{PrimeField, PrimeFieldRepr};
 use num_bigint::BigInt;
 use num_traits::Zero;
 use poseidon_rs::{Fr, FrRepr};
+use simple_asn1::ASN1Block;
 use std::io::Cursor;
 
 pub mod rarime_utils {
@@ -74,6 +76,7 @@ pub fn poseidon_hash_32_bytes(vec_big_int: &[BigInt]) -> Result<[u8; 32], Rarime
 
     Ok(big_int_32)
 }
+
 pub fn get_profile_key(private_key: &[u8; 32]) -> Result<[u8; 32], RarimeError> {
     let scalar_int = BigInt::from_bytes_be(num_bigint::Sign::Plus, private_key);
 
@@ -104,4 +107,20 @@ pub fn get_profile_key(private_key: &[u8; 32]) -> Result<[u8; 32], RarimeError> 
 
     let profile_key = poseidon_hash_32_bytes(&vec![x_big_int, y_big_int])?;
     Ok(profile_key)
+}
+
+pub fn extract_oid_from_asn1(oid_block: &ASN1Block) -> Result<ObjectIdentifier, RarimeError> {
+    let oid: ObjectIdentifier = if let ASN1Block::ObjectIdentifier(_, raw_oid) = oid_block {
+        ObjectIdentifier::from_bytes(
+            &raw_oid
+                .as_raw()
+                .map_err(|e| RarimeError::ASN1EncodeError(e))?,
+        )
+        .map_err(|e| RarimeError::OIDError(e))?
+    } else {
+        return Err(RarimeError::ASN1RouteError(
+            "Expected ObjectIdentifier block".to_string(),
+        ));
+    };
+    return Ok(oid);
 }

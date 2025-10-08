@@ -1,12 +1,9 @@
 use crate::RarimeError;
 use crate::RarimeError::PoseidonHashError;
-use crate::utils::{big_int_to_32_bytes, poseidon_hash_32_bytes};
+use crate::hash_algorithm::HashAlgorithm;
+use crate::utils::{big_int_to_32_bytes, extract_oid_from_asn1, poseidon_hash_32_bytes};
 use const_oid::ObjectIdentifier;
-use const_oid::db::rfc5912::{
-    ID_SHA_1, ID_SHA_224, ID_SHA_256, ID_SHA_384, ID_SHA_512, PKCS_1, SHA_1_WITH_RSA_ENCRYPTION,
-    SHA_224_WITH_RSA_ENCRYPTION, SHA_256_WITH_RSA_ENCRYPTION, SHA_384_WITH_RSA_ENCRYPTION,
-    SHA_512_WITH_RSA_ENCRYPTION,
-};
+use const_oid::db::rfc5912::PKCS_1;
 use contracts::{ContractsProvider, ContractsProviderConfig};
 use digest::Digest;
 use ff::{PrimeField, PrimeFieldRepr};
@@ -14,8 +11,6 @@ use num_bigint::BigInt;
 use num_traits::{One, Zero};
 use poseidon_rs::{Fr, Poseidon};
 use proofs::{LiteProofInput, ProofProvider};
-use sha1::Sha1;
-use sha2::{Sha224, Sha256, Sha384, Sha512};
 use simple_asn1::{ASN1Block, ASN1Class, BigUint, from_der, to_der};
 use std::io::Cursor;
 
@@ -37,41 +32,6 @@ pub struct RarimePassport {
     pub aa_signature: Option<Vec<u8>>,
     pub aa_challenge: Option<Vec<u8>>,
     pub sod: Vec<u8>,
-}
-
-#[derive(Debug)]
-pub enum HashAlgorithm {
-    SHA1,
-    SHA224,
-    SHA256,
-    SHA384,
-    SHA512,
-}
-
-impl HashAlgorithm {
-    pub fn get_byte_length(&self) -> usize {
-        match self {
-            HashAlgorithm::SHA1 => 160,
-            HashAlgorithm::SHA224 => 224,
-            HashAlgorithm::SHA256 => 256,
-            HashAlgorithm::SHA384 => 384,
-            HashAlgorithm::SHA512 => 512,
-        }
-    }
-    pub fn get_hash_fixed32(&self, data_bytes: &[u8]) -> [u8; 32] {
-        let digest = match self {
-            HashAlgorithm::SHA1 => Sha1::digest(data_bytes).to_vec(),
-            HashAlgorithm::SHA224 => Sha224::digest(data_bytes).to_vec(),
-            HashAlgorithm::SHA256 => Sha256::digest(data_bytes).to_vec(),
-            HashAlgorithm::SHA384 => Sha384::digest(data_bytes).to_vec(),
-            HashAlgorithm::SHA512 => Sha512::digest(data_bytes).to_vec(),
-        };
-
-        let mut padded_hash = [0u8; 32];
-        let len = std::cmp::min(digest.len(), 32);
-        padded_hash[..len].copy_from_slice(&digest[..len]);
-        return padded_hash;
-    }
 }
 
 pub(crate) async fn get_document_status(
@@ -196,8 +156,9 @@ impl RarimePassport {
     fn get_passport_hash(sod: &[u8]) -> Result<[u8; 32], RarimeError> {
         let sign_attr: ASN1Block = Self::extract_signed_attributes(sod)?;
 
-        let hash_algorithm = RarimePassport::extract_passport_hash_algorithm(sod)?;
-        let parsed_hash_algorithm = RarimePassport::parse_hash_algorithm(&hash_algorithm)?;
+        let hash_block = RarimePassport::extract_passport_hash_algorithm(sod)?;
+        let parsed_oid = extract_oid_from_asn1(&hash_block)?;
+        let parsed_hash_algorithm = HashAlgorithm::from_oid(parsed_oid)?;
 
         let mut sign_attr_bytes =
             to_der(&sign_attr).map_err(|e| RarimeError::DerError(e.to_string()))?;
@@ -627,44 +588,24 @@ impl RarimePassport {
         Ok(sig_alg_block)
     }
 
-    fn parse_hash_algorithm(oid_block: &ASN1Block) -> Result<HashAlgorithm, RarimeError> {
-        let oid: ObjectIdentifier = if let ASN1Block::ObjectIdentifier(_, raw_oid) = oid_block {
-            ObjectIdentifier::from_bytes(
-                &raw_oid
-                    .as_raw()
-                    .map_err(|e| RarimeError::ASN1EncodeError(e))?,
-            )
-            .map_err(|e| RarimeError::OIDError(e))?
-        } else {
-            return Err(RarimeError::ASN1RouteError(
-                "Expected ObjectIdentifier block".to_string(),
-            ));
-        };
-
-        match oid {
-            ID_SHA_1 | SHA_1_WITH_RSA_ENCRYPTION => Ok(HashAlgorithm::SHA1),
-            ID_SHA_224 | SHA_224_WITH_RSA_ENCRYPTION => Ok(HashAlgorithm::SHA224),
-            ID_SHA_256 | SHA_256_WITH_RSA_ENCRYPTION => Ok(HashAlgorithm::SHA256),
-            ID_SHA_384 | SHA_384_WITH_RSA_ENCRYPTION => Ok(HashAlgorithm::SHA384),
-            ID_SHA_512 | SHA_512_WITH_RSA_ENCRYPTION => Ok(HashAlgorithm::SHA512),
-            _ => Err(RarimeError::ASN1RouteError(
-                "Not supported ObjectIdentifier".to_string(),
-            )),
-        }
+    fn parse_signature_algorithm(oid: ObjectIdentifier) -> Result<(), RarimeError> {
+        todo!()
     }
 
     pub fn prove_dg1(&self, profile_key: &[u8; 32]) -> Result<Vec<u8>, RarimeError> {
-        let dg_algo = &self.extract_dg_hash_algo()?;
+        let dg_algo_block = &self.extract_dg_hash_algo()?;
 
-        let parsed_hash_algo = RarimePassport::parse_hash_algorithm(&dg_algo)?;
+        let parsed_oid = extract_oid_from_asn1(&dg_algo_block)?;
+        let parsed_hash_algorithm = HashAlgorithm::from_oid(parsed_oid)?;
 
         let proof_inputs = LiteProofInput {
             dg1_commitment: Vec::from(self.extract_dg1_commitment(profile_key)?),
-            dg1_hash: Vec::from(parsed_hash_algo.get_hash_fixed32(&self.data_group1)),
+            dg1_hash: Vec::from(parsed_hash_algorithm.get_hash_fixed32(&self.data_group1)),
             profile_key: Vec::from(profile_key),
         };
 
-        let proof_provider = ProofProvider::new(proof_inputs, parsed_hash_algo.get_byte_length());
+        let proof_provider =
+            ProofProvider::new(proof_inputs, parsed_hash_algorithm.get_byte_length());
         let register_proof = proof_provider.generate_lite_proof()?;
         return Ok(register_proof);
     }
