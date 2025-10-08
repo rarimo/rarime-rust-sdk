@@ -101,7 +101,7 @@ impl Rarime {
                 type_name: "register".to_string(),
                 attributes: Attributes {
                     document_sod: DocumentSod {
-                        hash_algorithm: "".to_string(), //todo
+                        hash_algorithm: passport.get_dg_hash_algorithm()?.to_string(),
                         signature_algorithm: passport.get_signature_algorithm()?.to_string(),
                         signed_attributes: STANDARD
                             .encode(to_der(&passport.extract_signed_attributes()?)?),

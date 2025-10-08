@@ -237,8 +237,15 @@ impl RarimePassport {
 
         Ok(poseidon_result)
     }
+    pub fn get_dg_hash_algorithm(&self) -> Result<HashAlgorithm, RarimeError> {
+        let dg_hash_algo_block = self.extract_dg_hash_algo_block()?;
+        let parsed_oid = extract_oid_from_asn1(&dg_hash_algo_block)?;
 
-    pub fn extract_dg_hash_algo(&self) -> Result<ASN1Block, RarimeError> {
+        let passport_signature = HashAlgorithm::from_oid(parsed_oid)?;
+        return Ok(passport_signature);
+    }
+
+    fn extract_dg_hash_algo_block(&self) -> Result<ASN1Block, RarimeError> {
         let sod_bytes = &self.sod;
         let blocks = from_der(sod_bytes).map_err(|e| RarimeError::DerError(e.to_string()))?;
 
@@ -573,14 +580,6 @@ impl RarimePassport {
                     && inner.len() == 2
                     && let ASN1Block::ObjectIdentifier(tag, oid) = &inner[0]
                 {
-                    let oid_string = oid
-                        .as_vec::<&BigUint>()
-                        .ok()?
-                        .iter()
-                        .map(|n| n.to_string())
-                        .collect::<Vec<_>>()
-                        .join(".");
-
                     return Some(ASN1Block::ObjectIdentifier(*tag, oid.clone()));
                 }
                 None
@@ -653,12 +652,7 @@ impl RarimePassport {
             ASN1Block::Sequence(_, content) => content,
             _ => {
                 return Err(RarimeError::ASN1RouteError(
-                    "Expected SEQUENCE inside [0]".to_string(),
-                ));
-            }
-            _ => {
-                return Err(RarimeError::ASN1RouteError(
-                    "Expected SEQUENCE inside [0]".to_string(),
+                    "Expected SEQUENCE inside encapsulated_content_wrapper".to_string(),
                 ));
             }
         };
@@ -667,14 +661,14 @@ impl RarimePassport {
             .iter()
             .find(|b| matches!(b, ASN1Block::Explicit(_, _, tag, _) if *tag == BigUint::from(0u32)))
             .ok_or(RarimeError::ASN1RouteError(
-                "No [0] tagged block found".to_string(),
+                "No encapsulated_content block found".to_string(),
             ))?;
 
         return Ok(encapsulated_content.clone());
     }
 
     pub fn prove_dg1(&self, profile_key: &[u8; 32]) -> Result<Vec<u8>, RarimeError> {
-        let dg_algo_block = &self.extract_dg_hash_algo()?;
+        let dg_algo_block = &self.extract_dg_hash_algo_block()?;
 
         let parsed_oid = extract_oid_from_asn1(&dg_algo_block)?;
         let parsed_hash_algorithm = HashAlgorithm::from_oid(parsed_oid)?;
