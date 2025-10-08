@@ -107,7 +107,7 @@ impl Rarime {
                             .encode(to_der(&passport.extract_signed_attributes()?)?),
                         encapsulated_content: STANDARD
                             .encode(to_der(&passport.extract_encapsulated_content()?)?),
-                        signature: "".to_string(),    //todo
+                        signature: STANDARD.encode(&passport.extract_signature()?),
                         aa_signature: "".to_string(), //todo
                         pem_file: "".to_string(),     //todo
                         dg15: match &passport.data_group15 {

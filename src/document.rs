@@ -245,6 +245,82 @@ impl RarimePassport {
         return Ok(passport_signature);
     }
 
+    pub fn extract_signature(&self) -> Result<Vec<u8>, RarimeError> {
+        let blocks = from_der(&self.sod).map_err(|e| RarimeError::DerError(e.to_string()))?;
+
+        let app23_seq = match &blocks[0] {
+            ASN1Block::Explicit(class, _, tag, content)
+                if *class == ASN1Class::Application && *tag == BigUint::from(23u32) =>
+            {
+                match content.as_ref() {
+                    ASN1Block::Sequence(_, inner) => inner,
+                    _ => {
+                        return Err(RarimeError::ASN1RouteError(
+                            "Expected SEQUENCE inside Application 23".to_string(),
+                        ));
+                    }
+                }
+            }
+            _ => {
+                return Err(RarimeError::ASN1RouteError(
+                    "Expected Application 23".to_string(),
+                ));
+            }
+        };
+
+        let tagged0 = app23_seq
+            .iter()
+            .find_map(|b| {
+                if let ASN1Block::Explicit(_, _, tag, content) = b
+                    && *tag == BigUint::from(0u32)
+                {
+                    return Some(content.as_ref());
+                }
+                None
+            })
+            .ok_or(RarimeError::ASN1RouteError(
+                "No [0] tagged block found in Application 23 SEQUENCE".to_string(),
+            ))?;
+
+        let inner_seq = match tagged0 {
+            ASN1Block::Sequence(_, inner) => inner,
+            _ => {
+                return Err(RarimeError::ASN1RouteError(
+                    "Expected SEQUENCE inside [0]".to_string(),
+                ));
+            }
+        };
+
+        let sequence_block = inner_seq
+            .iter()
+            .find_map(|b| {
+                if let ASN1Block::Set(_, content) = b
+                    && let Some(ASN1Block::Sequence(_, inner)) = content.first()
+                    && inner.len() == 6
+                {
+                    return Some(inner.clone());
+                }
+                None
+            })
+            .ok_or(RarimeError::ASN1RouteError(
+                "No inner SET containing 6-element SEQUENCE found".to_string(),
+            ))?;
+
+        let signature_bytes: Vec<u8> = sequence_block
+            .iter()
+            .find_map(|b| {
+                if let ASN1Block::OctetString(_, data) = b {
+                    return Some(data.to_vec());
+                }
+                None
+            })
+            .ok_or(RarimeError::ASN1RouteError(
+                "No OctetString (signature) found in the expected sequence.".to_string(),
+            ))?;
+
+        Ok(signature_bytes)
+    }
+
     fn extract_dg_hash_algo_block(&self) -> Result<ASN1Block, RarimeError> {
         let sod_bytes = &self.sod;
         let blocks = from_der(sod_bytes).map_err(|e| RarimeError::DerError(e.to_string()))?;
