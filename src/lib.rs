@@ -101,13 +101,15 @@ impl Rarime {
                 type_name: "register".to_string(),
                 attributes: Attributes {
                     document_sod: DocumentSod {
-                        hash_algorithm: "".to_string(),
+                        hash_algorithm: "".to_string(), //todo
                         signature_algorithm: passport.get_signature_algorithm()?.to_string(),
-                        signed_attributes: "".to_string(),
-                        encapsulated_content: "".to_string(),
-                        signature: "".to_string(),
-                        aa_signature: "".to_string(),
-                        pem_file: "".to_string(),
+                        signed_attributes: STANDARD
+                            .encode(to_der(&passport.extract_signed_attributes()?)?),
+                        encapsulated_content: STANDARD
+                            .encode(to_der(&passport.extract_encapsulated_content()?)?),
+                        signature: "".to_string(),    //todo
+                        aa_signature: "".to_string(), //todo
+                        pem_file: "".to_string(),     //todo
                         dg15: match &passport.data_group15 {
                             Some(value) => STANDARD.encode(value),
                             None => "".to_string(),
@@ -148,6 +150,7 @@ use api::types::verify_sod::{
 use contracts::{ContractsError, ContractsProviderConfig};
 pub use document::RarimePassport;
 use proofs::ProofError;
+use simple_asn1::to_der;
 use thiserror::Error;
 pub use utils::rarime_utils;
 
