@@ -102,7 +102,7 @@ impl Rarime {
                 attributes: Attributes {
                     document_sod: DocumentSod {
                         hash_algorithm: "".to_string(),
-                        signature_algorithm: "".to_string(),
+                        signature_algorithm: passport.get_signature_algorithm()?.to_string(),
                         signed_attributes: "".to_string(),
                         encapsulated_content: "".to_string(),
                         signature: "".to_string(),

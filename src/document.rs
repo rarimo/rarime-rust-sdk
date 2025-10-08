@@ -1,11 +1,9 @@
 use crate::RarimeError;
 use crate::RarimeError::PoseidonHashError;
 use crate::hash_algorithm::HashAlgorithm;
+use crate::signature_algorithm::SignatureAlgorithm;
 use crate::utils::{big_int_to_32_bytes, extract_oid_from_asn1, poseidon_hash_32_bytes};
-use const_oid::ObjectIdentifier;
-use const_oid::db::rfc5912::PKCS_1;
 use contracts::{ContractsProvider, ContractsProviderConfig};
-use digest::Digest;
 use ff::{PrimeField, PrimeFieldRepr};
 use num_bigint::BigInt;
 use num_traits::{One, Zero};
@@ -69,7 +67,7 @@ impl RarimePassport {
             };
         }
 
-        let passport_key = Self::get_passport_hash(&self.sod)?;
+        let passport_key = self.get_passport_hash()?;
 
         Ok(passport_key)
     }
@@ -153,10 +151,10 @@ impl RarimePassport {
         return Ok(big_int_32);
     }
 
-    fn get_passport_hash(sod: &[u8]) -> Result<[u8; 32], RarimeError> {
-        let sign_attr: ASN1Block = Self::extract_signed_attributes(sod)?;
+    fn get_passport_hash(&self) -> Result<[u8; 32], RarimeError> {
+        let sign_attr: ASN1Block = Self::extract_signed_attributes(&self.sod)?;
 
-        let hash_block = RarimePassport::extract_passport_hash_algorithm(sod)?;
+        let hash_block = RarimePassport::extract_passport_signature_block(&self)?;
         let parsed_oid = extract_oid_from_asn1(&hash_block)?;
         let parsed_hash_algorithm = HashAlgorithm::from_oid(parsed_oid)?;
 
@@ -499,8 +497,16 @@ impl RarimePassport {
         Ok(signed_attrs_block)
     }
 
-    fn extract_passport_hash_algorithm(sod_bytes: &[u8]) -> Result<ASN1Block, RarimeError> {
-        let blocks = from_der(sod_bytes).map_err(|e| RarimeError::DerError(e.to_string()))?;
+    pub fn get_signature_algorithm(&self) -> Result<SignatureAlgorithm, RarimeError> {
+        let passport_signature_block = self.extract_passport_signature_block()?;
+        let parsed_oid = extract_oid_from_asn1(&passport_signature_block)?;
+
+        let passport_signature = SignatureAlgorithm::from_oid(parsed_oid)?;
+        return Ok(passport_signature);
+    }
+
+    fn extract_passport_signature_block(&self) -> Result<ASN1Block, RarimeError> {
+        let blocks = from_der(&self.sod).map_err(|e| RarimeError::DerError(e.to_string()))?;
 
         let app23_seq = match &blocks[0] {
             ASN1Block::Explicit(class, _, tag, content)
@@ -575,9 +581,7 @@ impl RarimePassport {
                         .collect::<Vec<_>>()
                         .join(".");
 
-                    if oid_string.starts_with(PKCS_1.to_string().as_str()) {
-                        return Some(ASN1Block::ObjectIdentifier(*tag, oid.clone()));
-                    }
+                    return Some(ASN1Block::ObjectIdentifier(*tag, oid.clone()));
                 }
                 None
             })
@@ -586,10 +590,6 @@ impl RarimePassport {
             ))?;
 
         Ok(sig_alg_block)
-    }
-
-    fn parse_signature_algorithm(oid: ObjectIdentifier) -> Result<(), RarimeError> {
-        todo!()
     }
 
     pub fn prove_dg1(&self, profile_key: &[u8; 32]) -> Result<Vec<u8>, RarimeError> {

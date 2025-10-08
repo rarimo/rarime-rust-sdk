@@ -29,6 +29,7 @@ impl HashAlgorithm {
             HashAlgorithm::SHA512 => 512,
         }
     }
+
     pub fn get_hash_fixed32(&self, data_bytes: &[u8]) -> [u8; 32] {
         let digest = match self {
             HashAlgorithm::SHA1 => Sha1::digest(data_bytes).to_vec(),
@@ -43,6 +44,7 @@ impl HashAlgorithm {
         padded_hash[..len].copy_from_slice(&digest[..len]);
         return padded_hash;
     }
+
     pub fn to_string(&self) -> String {
         let string = match self {
             HashAlgorithm::SHA1 => "SHA1".to_string(),
