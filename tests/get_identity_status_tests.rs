@@ -20,6 +20,7 @@ mod tests {
             },
             api_configuration: RarimeAPIConfiguration {
                 json_rpc_evm_url: "https://rpc.evm.mainnet.rarimo.com".to_string(),
+                rarime_api_url: "https://api.orgs.app.stage.rarime.com".to_string(),
             },
             user_configuration: RarimeUserConfiguration {
                 user_private_key: Some(
@@ -65,6 +66,7 @@ mod tests {
             },
             api_configuration: RarimeAPIConfiguration {
                 json_rpc_evm_url: "https://rpc.evm.mainnet.rarimo.com".to_string(),
+                rarime_api_url: "https://api.orgs.app.stage.rarime.com".to_string(),
             },
             user_configuration: RarimeUserConfiguration {
                 user_private_key: Some(
@@ -110,6 +112,7 @@ mod tests {
             },
             api_configuration: RarimeAPIConfiguration {
                 json_rpc_evm_url: "https://rpc.evm.mainnet.rarimo.com".to_string(),
+                rarime_api_url: "https://api.orgs.app.stage.rarime.com".to_string(),
             },
             user_configuration: RarimeUserConfiguration {
                 user_private_key: Some(
