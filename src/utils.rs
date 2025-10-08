@@ -1,6 +1,3 @@
-mod types;
-mod verify_sod;
-
 use crate::RarimeError;
 use crate::RarimeError::PoseidonHashError;
 use ff::{PrimeField, PrimeFieldRepr};

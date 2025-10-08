@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 //request types
 #[derive(Serialize, Debug)]
@@ -36,13 +36,11 @@ pub struct Data {
 }
 
 #[derive(Serialize, Debug)]
-pub struct PostRequest {
+pub struct VerifySodRequest {
     pub data: Data,
 }
 
 //response types
-
-use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
 pub struct LightRegistrationData {
