@@ -109,7 +109,7 @@ impl Rarime {
                             .encode(to_der(&passport.extract_encapsulated_content()?)?),
                         signature: STANDARD.encode(&passport.extract_signature()?),
                         aa_signature: "".to_string(), //todo
-                        pem_file: "".to_string(),     //todo
+                        pem_file: passport.get_certificate_pem()?,
                         dg15: match &passport.data_group15 {
                             Some(value) => STANDARD.encode(value),
                             None => "".to_string(),
@@ -123,9 +123,9 @@ impl Rarime {
             },
         };
 
-        let verify_sod_result = api_provider.verify_sod(&verify_sod_request).await?;
+        let verify_sod_responce = api_provider.verify_sod(&verify_sod_request).await?;
 
-        return Ok(verify_sod_result);
+        return Ok(verify_sod_responce);
     }
 }
 

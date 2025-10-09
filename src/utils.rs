@@ -1,11 +1,13 @@
 use crate::RarimeError;
 use crate::RarimeError::PoseidonHashError;
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use const_oid::ObjectIdentifier;
 use ff::{PrimeField, PrimeFieldRepr};
 use num_bigint::BigInt;
 use num_traits::Zero;
 use poseidon_rs::{Fr, FrRepr};
-use simple_asn1::ASN1Block;
+use simple_asn1::{ASN1Block, to_der};
 use std::io::Cursor;
 
 pub mod rarime_utils {
@@ -123,4 +125,28 @@ pub fn extract_oid_from_asn1(oid_block: &ASN1Block) -> Result<ObjectIdentifier, 
         ));
     };
     return Ok(oid);
+}
+
+pub fn convert_asn1_to_pem(asn1_block: &ASN1Block) -> Result<String, RarimeError> {
+    let der_bytes = to_der(asn1_block).map_err(|e| RarimeError::ASN1EncodeError(e))?;
+
+    let base64_content = STANDARD.encode(der_bytes);
+
+    let pem_header = "-----BEGIN CERTIFICATE-----\n";
+    let pem_footer = "\n-----END CERTIFICATE-----";
+
+    let formatted_base64 = base64_content
+        .as_bytes()
+        .chunks(64)
+        .map(|chunk| format!("{}\n", String::from_utf8_lossy(chunk)))
+        .collect::<String>();
+
+    let pem_string = format!(
+        "{}{}{}",
+        pem_header,
+        formatted_base64.trim_end(),
+        pem_footer
+    );
+
+    Ok(pem_string)
 }
