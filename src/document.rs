@@ -652,7 +652,6 @@ impl RarimePassport {
     pub fn get_signature_algorithm(&self) -> Result<SignatureAlgorithm, RarimeError> {
         let passport_signature_block = self.extract_passport_signature_block()?;
         let parsed_oid = extract_oid_from_asn1(&passport_signature_block)?;
-
         let passport_signature = SignatureAlgorithm::from_oid(parsed_oid)?;
         return Ok(passport_signature);
     }
@@ -725,12 +724,22 @@ impl RarimePassport {
                     && inner.len() == 2
                     && let ASN1Block::ObjectIdentifier(tag, oid) = &inner[0]
                 {
-                    return Some(ASN1Block::ObjectIdentifier(*tag, oid.clone()));
+                    let oid_string = oid
+                        .as_vec::<&BigUint>()
+                        .ok()?
+                        .iter()
+                        .map(|n| n.to_string())
+                        .collect::<Vec<_>>()
+                        .join(".");
+
+                    if oid_string.starts_with("1.2.840.".to_string().as_str()) {
+                        return Some(ASN1Block::ObjectIdentifier(*tag, oid.clone()));
+                    }
                 }
                 None
             })
             .ok_or(RarimeError::ASN1RouteError(
-                "No RSA+SHA signature algorithm OID found".to_string(),
+                "No signature algorithm OID found".to_string(),
             ))?;
 
         Ok(sig_alg_block)

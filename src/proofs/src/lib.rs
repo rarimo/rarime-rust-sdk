@@ -26,14 +26,12 @@ impl ProofProvider {
 
     pub fn generate_lite_proof(&self) -> Result<Vec<u8>, ProofError> {
         let path = format!(
-            "src/assets/register_lite_{}.json",
+            "src/proofs/src/assets/register_lite_{}.json",
             self.hash_size.to_string()
         );
-
         let json_string = fs::read_to_string(path).map_err(|e| ProofError::Io(e))?;
         let json_value: Value =
             serde_json::from_str(&json_string).map_err(|e| ProofError::Json(e))?;
-
         let bytecode_value = json_value
             .get("bytecode")
             .ok_or(ProofError::MissingField("bytecode value".to_string()))?;
