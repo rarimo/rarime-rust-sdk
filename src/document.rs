@@ -160,7 +160,7 @@ impl RarimePassport {
         let parsed_oid = extract_oid_from_asn1(&hash_block)?;
         let parsed_hash_algorithm = HashAlgorithm::from_oid(parsed_oid)?;
 
-        let mut sign_attr_bytes =
+        let sign_attr_bytes =
             to_der(&sign_attr).map_err(|e| RarimeError::DerError(e.to_string()))?;
 
         let hash = parsed_hash_algorithm.get_hash_fixed32(&sign_attr_bytes);

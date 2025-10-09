@@ -89,7 +89,7 @@ impl Rarime {
         Ok(result)
     }
 
-    async fn verify_sod(
+    pub async fn verify_sod(
         &mut self,
         passport: &RarimePassport,
     ) -> Result<VerifySodResponse, RarimeError> {
@@ -103,18 +103,23 @@ impl Rarime {
                     document_sod: DocumentSod {
                         hash_algorithm: passport.get_dg_hash_algorithm()?.to_string(),
                         signature_algorithm: passport.get_signature_algorithm()?.to_string(),
-                        signed_attributes: STANDARD
-                            .encode(to_der(&passport.extract_signed_attributes()?)?),
-                        encapsulated_content: STANDARD
-                            .encode(to_der(&passport.extract_encapsulated_content()?)?),
-                        signature: STANDARD.encode(&passport.extract_signature()?),
-                        aa_signature: "".to_string(), //todo
-                        pem_file: passport.get_certificate_pem()?,
-                        dg15: match &passport.data_group15 {
-                            Some(value) => STANDARD.encode(value),
+                        signed_attributes: hex::encode(to_der(
+                            &passport.extract_signed_attributes()?,
+                        )?),
+                        encapsulated_content: hex::encode(to_der(
+                            &passport.extract_encapsulated_content()?,
+                        )?),
+                        signature: hex::encode(&passport.extract_signature()?),
+                        aa_signature: match &passport.aa_signature {
+                            Some(value) => hex::encode(value),
                             None => "".to_string(),
                         },
-                        sod: STANDARD.encode(&passport.sod),
+                        pem_file: passport.get_certificate_pem()?,
+                        dg15: match &passport.data_group15 {
+                            Some(value) => hex::encode(value),
+                            None => "".to_string(),
+                        },
+                        sod: hex::encode(&passport.sod),
                     },
                     zk_proof: ZkProof {
                         proof: self.get_register_proof(passport)?,
@@ -140,8 +145,7 @@ impl RarimeUtils {
 pub use crate::document::DocumentStatus;
 use crate::document::get_document_status;
 use crate::utils::get_profile_key;
-use ::base64::engine::general_purpose::STANDARD;
-use ::base64::{DecodeError, Engine};
+use ::base64::DecodeError;
 use api::ApiProvider;
 use api::errors::ApiError;
 use api::types::verify_sod::{
