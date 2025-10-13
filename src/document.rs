@@ -419,6 +419,105 @@ impl RarimePassport {
         Ok(oid_block)
     }
 
+    pub fn extract_dg_hash_algo(&self) -> Result<ASN1Block, RarimeError> {
+        let sod_bytes = &self.sod;
+        let blocks = from_der(sod_bytes).map_err(|e| RarimeError::DerError(e.to_string()))?;
+
+        let app23_block = blocks
+            .iter()
+            .find(|b| {
+                matches!(b, ASN1Block::Explicit(class, _, tag, _)
+            if *class == ASN1Class::Application && *tag == BigUint::from(23u32))
+            })
+            .ok_or(RarimeError::ASN1RouteError(
+                "Expected Application 23 SEQUENCE in the root".to_string(),
+            ))?;
+
+        let seq_in_app23 = match app23_block {
+            ASN1Block::Explicit(_, _, _, content) => match content.as_ref() {
+                ASN1Block::Sequence(_, inner) => inner,
+                _ => {
+                    return Err(RarimeError::ASN1RouteError(
+                        "Expected SEQUENCE inside Application 23".to_string(),
+                    ));
+                }
+            },
+            _ => {
+                return Err(RarimeError::ASN1RouteError(
+                    "Expected Explicit block for Application[23]".to_string(),
+                ));
+            }
+        };
+
+        let tagged0_block = seq_in_app23
+            .iter()
+            .find(|b| matches!(b, ASN1Block::Explicit(_, _, tag, _) if *tag == BigUint::from(0u32)))
+            .ok_or(RarimeError::ASN1RouteError(
+                "No [0] tagged block found".to_string(),
+            ))?;
+
+        let seq_in_tagged0 = match tagged0_block {
+            ASN1Block::Explicit(_, _, _, content) => match content.as_ref() {
+                ASN1Block::Sequence(_, inner) => inner,
+                _ => {
+                    return Err(RarimeError::ASN1RouteError(
+                        "Expected SEQUENCE inside [0]".to_string(),
+                    ));
+                }
+            },
+            _ => {
+                return Err(RarimeError::ASN1RouteError(
+                    "Expected Explicit block for [0]".to_string(),
+                ));
+            }
+        };
+
+        let set_block = seq_in_tagged0
+            .iter()
+            .find(|b| matches!(b, ASN1Block::Set(_, _)))
+            .ok_or(RarimeError::ASN1RouteError(
+                ("No SET found inside [0] SEQUENCE").to_string(),
+            ))?;
+
+        let inner_seq = if let ASN1Block::Set(_, content) = set_block {
+            let seq = content
+                .get(0)
+                .ok_or(RarimeError::ASN1RouteError(("SET is empty").to_string()))?;
+            match seq {
+                ASN1Block::Sequence(_, _) => seq,
+                _ => {
+                    return Err(RarimeError::ASN1RouteError(
+                        "Expected SEQUENCE as first element of SET".to_string(),
+                    ));
+                }
+            }
+        } else {
+            return Err(RarimeError::ASN1RouteError(
+                "Expected SET block".to_string(),
+            ));
+        };
+
+        let oid_block = if let ASN1Block::Sequence(_, seq_content) = inner_seq {
+            let oid = seq_content.get(0).ok_or(RarimeError::ASN1RouteError(
+                ("Inner SEQUENCE is empty").to_string(),
+            ))?;
+            match oid {
+                ASN1Block::ObjectIdentifier(_, _) => oid.clone(),
+                _ => {
+                    return Err(RarimeError::ASN1RouteError(
+                        "Expected ObjectIdentifier as first element of inner SEQUENCE".to_string(),
+                    ));
+                }
+            }
+        } else {
+            return Err(RarimeError::ASN1RouteError(
+                "Expected ObjectIdentifier as first element of inner SEQUENCE".to_string(),
+            ));
+        };
+
+        Ok(oid_block)
+    }
+
     fn parse_dg15_pubkey(dg15_bytes: &[u8]) -> Result<ActiveAuthKey, RarimeError> {
         let blocks = from_der(dg15_bytes).map_err(|e| RarimeError::DerError(e.to_string()))?;
 
@@ -838,5 +937,21 @@ impl RarimePassport {
             }
         };
         Ok(inner_seq[0].clone())
+    }
+
+    pub fn prove_dg1(&self, profile_key: &[u8; 32]) -> Result<Vec<u8>, RarimeError> {
+        let dg_algo = &self.extract_dg_hash_algo()?;
+
+        let parsed_hash_algo = RarimePassport::parse_hash_algorithm(&dg_algo)?;
+
+        let proof_inputs = LiteProofInput {
+            dg1_commitment: Vec::from(self.extract_dg1_commitment(profile_key)?),
+            dg1_hash: Vec::from(parsed_hash_algo.get_hash_fixed32(&self.data_group1)),
+            profile_key: Vec::from(profile_key),
+        };
+
+        let proof_provider = ProofProvider::new(proof_inputs, parsed_hash_algo.get_byte_length());
+        let register_proof = proof_provider.generate_lite_proof()?;
+        return Ok(register_proof);
     }
 }
