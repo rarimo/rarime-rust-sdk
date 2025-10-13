@@ -1,17 +1,23 @@
 use crate::RarimeError;
-use crate::utils::poseidon_hash_32_bytes;
+use crate::RarimeError::PoseidonHashError;
+use crate::utils::{big_int_to_32_bytes, poseidon_hash_32_bytes};
 use const_oid::ObjectIdentifier;
 use const_oid::db::rfc5912::{
-    PKCS_1, SHA_1_WITH_RSA_ENCRYPTION, SHA_224_WITH_RSA_ENCRYPTION, SHA_256_WITH_RSA_ENCRYPTION,
-    SHA_384_WITH_RSA_ENCRYPTION, SHA_512_WITH_RSA_ENCRYPTION,
+    ID_SHA_1, ID_SHA_224, ID_SHA_256, ID_SHA_384, ID_SHA_512, PKCS_1, SHA_1_WITH_RSA_ENCRYPTION,
+    SHA_224_WITH_RSA_ENCRYPTION, SHA_256_WITH_RSA_ENCRYPTION, SHA_384_WITH_RSA_ENCRYPTION,
+    SHA_512_WITH_RSA_ENCRYPTION,
 };
 use contracts::{ContractsProvider, ContractsProviderConfig};
 use digest::Digest;
+use ff::{PrimeField, PrimeFieldRepr};
 use num_bigint::BigInt;
 use num_traits::{One, Zero};
+use poseidon_rs::{Fr, Poseidon};
+use proofs::{LiteProofInput, ProofProvider};
 use sha1::Sha1;
 use sha2::{Sha224, Sha256, Sha384, Sha512};
 use simple_asn1::{ASN1Block, ASN1Class, BigUint, from_der, to_der};
+use std::io::Cursor;
 
 enum ActiveAuthKey {
     Rsa { modulus: BigInt, exponent: BigInt },
@@ -34,12 +40,38 @@ pub struct RarimePassport {
 }
 
 #[derive(Debug)]
-enum SignatureDigestHashAlgorithm {
+pub enum HashAlgorithm {
     SHA1,
     SHA224,
     SHA256,
     SHA384,
     SHA512,
+}
+
+impl HashAlgorithm {
+    pub fn get_byte_length(&self) -> usize {
+        match self {
+            HashAlgorithm::SHA1 => 160,
+            HashAlgorithm::SHA224 => 224,
+            HashAlgorithm::SHA256 => 256,
+            HashAlgorithm::SHA384 => 384,
+            HashAlgorithm::SHA512 => 512,
+        }
+    }
+    pub fn get_hash_fixed32(&self, data_bytes: &[u8]) -> [u8; 32] {
+        let digest = match self {
+            HashAlgorithm::SHA1 => Sha1::digest(data_bytes).to_vec(),
+            HashAlgorithm::SHA224 => Sha224::digest(data_bytes).to_vec(),
+            HashAlgorithm::SHA256 => Sha256::digest(data_bytes).to_vec(),
+            HashAlgorithm::SHA384 => Sha384::digest(data_bytes).to_vec(),
+            HashAlgorithm::SHA512 => Sha512::digest(data_bytes).to_vec(),
+        };
+
+        let mut padded_hash = [0u8; 32];
+        let len = std::cmp::min(digest.len(), 32);
+        padded_hash[..len].copy_from_slice(&digest[..len]);
+        return padded_hash;
+    }
 }
 
 pub(crate) async fn get_document_status(
@@ -82,10 +114,89 @@ impl RarimePassport {
         Ok(passport_key)
     }
 
+    /// Extracts and computes a cryptographic commitment from `data_group1`
+    /// using the provided secret identity key `sk_identity`.
+    ///
+    /// # Description
+    /// This function performs the following steps:
+    /// 1. Splits the binary data in `data_group1` into 4 chunks.
+    /// 2. Each chunk is interpreted as a large integer (`BigInt`) built bit by bit.
+    /// 3. Each of these four big integers is converted into a field element.
+    /// 4. The `sk_identity` (32-byte private key) is also converted into an `Fr` element.
+    /// 5. The private key is hashed using the Poseidon hash function, and the resulting field element
+    ///    is appended to the list of field elements.
+    /// 6. All collected field elements are then hashed again using Poseidon to produce the final commitment.
+    /// 7. The resulting field element is converted back into a 32-byte array and returned.
+    ///
+    pub fn extract_dg1_commitment(&self, sk_identity: &[u8; 32]) -> Result<[u8; 32], RarimeError> {
+        let chunk_len = &self.data_group1.len() * 2;
+        let mut vec_fr = vec![];
+
+        for i in 0..4 {
+            let start_bit = i * chunk_len;
+            let mut chunk = BigInt::from(0u64);
+            let mut current = BigInt::from(1u64);
+            let two = BigInt::from(2u64);
+
+            for bit_pos in 0..chunk_len {
+                let global_bit_idx = start_bit + bit_pos;
+                let byte_idx = global_bit_idx / 8;
+                let bit_in_byte = global_bit_idx % 8;
+                let byte = &self.data_group1[byte_idx];
+                let bit_is_set = ((byte >> bit_in_byte) & 1) != 0;
+                if bit_is_set {
+                    let tmp = current.clone();
+                    chunk += tmp;
+                }
+                // current *= 2
+                let mut new_current = current;
+                new_current *= two.clone();
+                current = new_current;
+            }
+            let bytes = big_int_to_32_bytes(&chunk);
+            let mut repr = poseidon_rs::FrRepr::default();
+
+            let mut cursor = Cursor::new(&bytes);
+            repr.read_be(&mut cursor)
+                .expect("error convert BigInt to Fr ");
+            vec_fr.push(Fr::from_repr(repr).expect("error converting repr to Fr"));
+        }
+
+        let mut repr = poseidon_rs::FrRepr::default();
+
+        let mut cursor = Cursor::new(&sk_identity);
+        repr.read_be(&mut cursor)
+            .expect("error convert BigInt to Fr ");
+
+        let sk_fr = Fr::from_repr(repr).expect("error converting Repr to Fr");
+
+        let poseidon_hasher = Poseidon::new();
+
+        let inner = poseidon_hasher
+            .hash(vec![sk_fr])
+            .map_err(PoseidonHashError)?;
+        vec_fr.push(inner);
+
+        let hash_result: Fr = poseidon_hasher.hash(vec_fr).map_err(PoseidonHashError)?;
+
+        let repr = hash_result.into_repr();
+
+        let mut raw_hash_bytes = Vec::new();
+
+        repr.write_be(&mut raw_hash_bytes)
+            .expect("Error converting repr to bytes");
+
+        let result_big_int = BigInt::from_bytes_be(num_bigint::Sign::Plus, &raw_hash_bytes);
+
+        let big_int_32 = big_int_to_32_bytes(&result_big_int);
+
+        return Ok(big_int_32);
+    }
+
     fn get_passport_hash(sod: &[u8]) -> Result<[u8; 32], RarimeError> {
         let sign_attr: ASN1Block = Self::extract_signed_attributes(sod)?;
 
-        let hash_algorithm = RarimePassport::extract_hash_algorithm(sod)?;
+        let hash_algorithm = RarimePassport::extract_passport_hash_algorithm(sod)?;
         let parsed_hash_algorithm = RarimePassport::parse_hash_algorithm(&hash_algorithm)?;
 
         let mut sign_attr_bytes =
@@ -94,23 +205,13 @@ impl RarimePassport {
         // Ref: RFC 5652 (CMS) section 5.4, detailing the structure's ASN.1 definition.
         sign_attr_bytes[0] = 0x31;
 
-        let hash_bytes = match parsed_hash_algorithm {
-            SignatureDigestHashAlgorithm::SHA1 => Sha1::digest(&sign_attr_bytes).to_vec(),
-            SignatureDigestHashAlgorithm::SHA224 => Sha224::digest(&sign_attr_bytes).to_vec(),
-            SignatureDigestHashAlgorithm::SHA256 => Sha256::digest(&sign_attr_bytes).to_vec(),
-            SignatureDigestHashAlgorithm::SHA384 => Sha384::digest(&sign_attr_bytes).to_vec(),
-            SignatureDigestHashAlgorithm::SHA512 => Sha512::digest(&sign_attr_bytes).to_vec(),
-        };
-
-        let mut padded_hash = [0u8; 32];
-        let len = std::cmp::min(hash_bytes.len(), 32);
-        padded_hash[..len].copy_from_slice(&hash_bytes[..len]);
+        let hash = parsed_hash_algorithm.get_hash_fixed32(&sign_attr_bytes);
 
         let mut out = BigInt::zero();
         let mut acc: u64 = 0;
         let mut acc_bits = 0usize;
         for i in (0..252).rev() {
-            acc = (acc << 1) | (((padded_hash[i / 8] >> (7 - (i % 8))) & 1) as u64);
+            acc = (acc << 1) | (((hash[i / 8] >> (7 - (i % 8))) & 1) as u64);
             acc_bits += 1;
             if acc_bits == 64 {
                 out = (out << 64) | BigInt::from(acc);
@@ -176,6 +277,105 @@ impl RarimePassport {
         let poseidon_result = poseidon_hash_32_bytes(&chunks)?;
 
         Ok(poseidon_result)
+    }
+
+    pub fn extract_dg_hash_algo(&self) -> Result<ASN1Block, RarimeError> {
+        let sod_bytes = &self.sod;
+        let blocks = from_der(sod_bytes).map_err(|e| RarimeError::DerError(e.to_string()))?;
+
+        let app23_block = blocks
+            .iter()
+            .find(|b| {
+                matches!(b, ASN1Block::Explicit(class, _, tag, _)
+            if *class == ASN1Class::Application && *tag == BigUint::from(23u32))
+            })
+            .ok_or(RarimeError::ASN1RouteError(
+                "Expected Application 23 SEQUENCE in the root".to_string(),
+            ))?;
+
+        let seq_in_app23 = match app23_block {
+            ASN1Block::Explicit(_, _, _, content) => match content.as_ref() {
+                ASN1Block::Sequence(_, inner) => inner,
+                _ => {
+                    return Err(RarimeError::ASN1RouteError(
+                        "Expected SEQUENCE inside Application 23".to_string(),
+                    ));
+                }
+            },
+            _ => {
+                return Err(RarimeError::ASN1RouteError(
+                    "Expected Explicit block for Application[23]".to_string(),
+                ));
+            }
+        };
+
+        let tagged0_block = seq_in_app23
+            .iter()
+            .find(|b| matches!(b, ASN1Block::Explicit(_, _, tag, _) if *tag == BigUint::from(0u32)))
+            .ok_or(RarimeError::ASN1RouteError(
+                "No [0] tagged block found".to_string(),
+            ))?;
+
+        let seq_in_tagged0 = match tagged0_block {
+            ASN1Block::Explicit(_, _, _, content) => match content.as_ref() {
+                ASN1Block::Sequence(_, inner) => inner,
+                _ => {
+                    return Err(RarimeError::ASN1RouteError(
+                        "Expected SEQUENCE inside [0]".to_string(),
+                    ));
+                }
+            },
+            _ => {
+                return Err(RarimeError::ASN1RouteError(
+                    "Expected Explicit block for [0]".to_string(),
+                ));
+            }
+        };
+
+        let set_block = seq_in_tagged0
+            .iter()
+            .find(|b| matches!(b, ASN1Block::Set(_, _)))
+            .ok_or(RarimeError::ASN1RouteError(
+                ("No SET found inside [0] SEQUENCE").to_string(),
+            ))?;
+
+        let inner_seq = if let ASN1Block::Set(_, content) = set_block {
+            let seq = content
+                .get(0)
+                .ok_or(RarimeError::ASN1RouteError(("SET is empty").to_string()))?;
+            match seq {
+                ASN1Block::Sequence(_, _) => seq,
+                _ => {
+                    return Err(RarimeError::ASN1RouteError(
+                        "Expected SEQUENCE as first element of SET".to_string(),
+                    ));
+                }
+            }
+        } else {
+            return Err(RarimeError::ASN1RouteError(
+                "Expected SET block".to_string(),
+            ));
+        };
+
+        let oid_block = if let ASN1Block::Sequence(_, seq_content) = inner_seq {
+            let oid = seq_content.get(0).ok_or(RarimeError::ASN1RouteError(
+                ("Inner SEQUENCE is empty").to_string(),
+            ))?;
+            match oid {
+                ASN1Block::ObjectIdentifier(_, _) => oid.clone(),
+                _ => {
+                    return Err(RarimeError::ASN1RouteError(
+                        "Expected ObjectIdentifier as first element of inner SEQUENCE".to_string(),
+                    ));
+                }
+            }
+        } else {
+            return Err(RarimeError::ASN1RouteError(
+                "Expected ObjectIdentifier as first element of inner SEQUENCE".to_string(),
+            ));
+        };
+
+        Ok(oid_block)
     }
 
     fn parse_dg15_pubkey(dg15_bytes: &[u8]) -> Result<ActiveAuthKey, RarimeError> {
@@ -338,7 +538,7 @@ impl RarimePassport {
         Ok(signed_attrs_block)
     }
 
-    fn extract_hash_algorithm(sod_bytes: &[u8]) -> Result<ASN1Block, RarimeError> {
+    fn extract_passport_hash_algorithm(sod_bytes: &[u8]) -> Result<ASN1Block, RarimeError> {
         let blocks = from_der(sod_bytes).map_err(|e| RarimeError::DerError(e.to_string()))?;
 
         let app23_seq = match &blocks[0] {
@@ -427,9 +627,7 @@ impl RarimePassport {
         Ok(sig_alg_block)
     }
 
-    fn parse_hash_algorithm(
-        oid_block: &ASN1Block,
-    ) -> Result<SignatureDigestHashAlgorithm, RarimeError> {
+    fn parse_hash_algorithm(oid_block: &ASN1Block) -> Result<HashAlgorithm, RarimeError> {
         let oid: ObjectIdentifier = if let ASN1Block::ObjectIdentifier(_, raw_oid) = oid_block {
             ObjectIdentifier::from_bytes(
                 &raw_oid
@@ -444,14 +642,30 @@ impl RarimePassport {
         };
 
         match oid {
-            SHA_1_WITH_RSA_ENCRYPTION => Ok(SignatureDigestHashAlgorithm::SHA1),
-            SHA_224_WITH_RSA_ENCRYPTION => Ok(SignatureDigestHashAlgorithm::SHA224),
-            SHA_256_WITH_RSA_ENCRYPTION => Ok(SignatureDigestHashAlgorithm::SHA256),
-            SHA_384_WITH_RSA_ENCRYPTION => Ok(SignatureDigestHashAlgorithm::SHA384),
-            SHA_512_WITH_RSA_ENCRYPTION => Ok(SignatureDigestHashAlgorithm::SHA512),
+            ID_SHA_1 | SHA_1_WITH_RSA_ENCRYPTION => Ok(HashAlgorithm::SHA1),
+            ID_SHA_224 | SHA_224_WITH_RSA_ENCRYPTION => Ok(HashAlgorithm::SHA224),
+            ID_SHA_256 | SHA_256_WITH_RSA_ENCRYPTION => Ok(HashAlgorithm::SHA256),
+            ID_SHA_384 | SHA_384_WITH_RSA_ENCRYPTION => Ok(HashAlgorithm::SHA384),
+            ID_SHA_512 | SHA_512_WITH_RSA_ENCRYPTION => Ok(HashAlgorithm::SHA512),
             _ => Err(RarimeError::ASN1RouteError(
                 "Not supported ObjectIdentifier".to_string(),
             )),
         }
+    }
+
+    pub fn prove_dg1(&self, profile_key: &[u8; 32]) -> Result<Vec<u8>, RarimeError> {
+        let dg_algo = &self.extract_dg_hash_algo()?;
+
+        let parsed_hash_algo = RarimePassport::parse_hash_algorithm(&dg_algo)?;
+
+        let proof_inputs = LiteProofInput {
+            dg1_commitment: Vec::from(self.extract_dg1_commitment(profile_key)?),
+            dg1_hash: Vec::from(parsed_hash_algo.get_hash_fixed32(&self.data_group1)),
+            profile_key: Vec::from(profile_key),
+        };
+
+        let proof_provider = ProofProvider::new(proof_inputs, parsed_hash_algo.get_byte_length());
+        let register_proof = proof_provider.generate_lite_proof()?;
+        return Ok(register_proof);
     }
 }

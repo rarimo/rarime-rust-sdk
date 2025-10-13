@@ -50,6 +50,7 @@ impl Rarime {
                 .state_keeper_contract_address
                 .clone(),
         };
+
         let private_key: [u8; 32] = match self.config.user_configuration.user_private_key.clone() {
             Some(key) => key,
             None => {
@@ -58,11 +59,32 @@ impl Rarime {
                 new_key
             }
         };
+
         let profile_key = get_profile_key(&private_key)?;
 
         let passport_key = passport.get_passport_key()?;
 
         let result = get_document_status(&passport_key, &profile_key, config).await?;
+
+        Ok(result)
+    }
+
+    pub fn get_register_proof(
+        &mut self,
+        passport: &RarimePassport,
+    ) -> Result<Vec<u8>, RarimeError> {
+        let private_key: [u8; 32] = match self.config.user_configuration.user_private_key.clone() {
+            Some(key) => key,
+            None => {
+                let new_key = RarimeUtils::generate_bjj_private_key()?;
+                self.config.user_configuration.user_private_key = Some(new_key);
+                new_key
+            }
+        };
+
+        let profile_key = get_profile_key(&private_key)?;
+
+        let result = passport.prove_dg1(&profile_key)?;
 
         Ok(result)
     }
@@ -82,6 +104,7 @@ use crate::utils::get_profile_key;
 use ::base64::DecodeError;
 use contracts::{ContractsError, ContractsProviderConfig};
 pub use document::RarimePassport;
+use proofs::ProofError;
 use thiserror::Error;
 pub use utils::rarime_utils;
 
@@ -131,4 +154,6 @@ pub enum RarimeError {
     ContractError(ContractsError),
     #[error("OID operation error: {0}")]
     OIDError(const_oid::Error),
+    #[error("Generate proof error: {0}")]
+    ProveError(#[from] ProofError),
 }
