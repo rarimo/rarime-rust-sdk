@@ -52,7 +52,7 @@ mod tests {
         };
 
         let result = tokio::task::spawn_blocking(move || {
-            futures::executor::block_on(rarime.verify_sod(&passport))
+            futures::executor::block_on(rarime.light_registration(&passport))
         })
         .await
         .unwrap()
@@ -104,7 +104,7 @@ mod tests {
         };
 
         let result = tokio::task::spawn_blocking(move || {
-            futures::executor::block_on(rarime.verify_sod(&passport))
+            futures::executor::block_on(rarime.light_registration(&passport))
         })
         .await
         .unwrap()
@@ -152,7 +152,7 @@ mod tests {
         };
 
         let result = tokio::task::spawn_blocking(move || {
-            futures::executor::block_on(rarime.verify_sod(&passport))
+            futures::executor::block_on(rarime.light_registration(&passport))
         })
         .await
         .unwrap()

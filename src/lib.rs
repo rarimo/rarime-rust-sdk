@@ -89,7 +89,7 @@ impl Rarime {
         Ok(result)
     }
 
-    pub async fn verify_sod(
+    pub async fn light_registration(
         &mut self,
         passport: &RarimePassport,
     ) -> Result<VerifySodResponse, RarimeError> {
@@ -128,9 +128,9 @@ impl Rarime {
             },
         };
 
-        let verify_sod_responce = api_provider.verify_sod(&verify_sod_request).await?;
+        let verify_sod_response = api_provider.verify_sod(&verify_sod_request).await?;
 
-        return Ok(verify_sod_responce);
+        return Ok(verify_sod_response);
     }
 }
 
