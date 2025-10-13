@@ -844,24 +844,6 @@ impl RarimePassport {
         Ok(sig_alg_block)
     }
 
-    pub fn prove_dg1(&self, profile_key: &[u8; 32]) -> Result<Vec<u8>, RarimeError> {
-        let dg_algo_block = &self.extract_dg_hash_algo_block()?;
-
-        let parsed_oid = extract_oid_from_asn1(&dg_algo_block)?;
-        let parsed_hash_algorithm = HashAlgorithm::from_oid(parsed_oid)?;
-
-        let proof_inputs = LiteProofInput {
-            dg1_commitment: Vec::from(self.extract_dg1_commitment(profile_key)?),
-            dg1_hash: Vec::from(parsed_hash_algorithm.get_hash_fixed32(&self.data_group1)),
-            profile_key: Vec::from(profile_key),
-        };
-
-        let proof_provider =
-            ProofProvider::new(proof_inputs, parsed_hash_algorithm.get_byte_length());
-        let register_proof = proof_provider.generate_lite_proof()?;
-        return Ok(register_proof);
-    }
-
     pub fn get_certificate_pem(&self) -> Result<String, RarimeError> {
         let extracted_certificate_block = self.extract_certificate()?;
         let pem_certificate = convert_asn1_to_pem(&extracted_certificate_block)?;
@@ -940,17 +922,19 @@ impl RarimePassport {
     }
 
     pub fn prove_dg1(&self, profile_key: &[u8; 32]) -> Result<Vec<u8>, RarimeError> {
-        let dg_algo = &self.extract_dg_hash_algo()?;
+        let dg_algo_block = &self.extract_dg_hash_algo_block()?;
 
-        let parsed_hash_algo = RarimePassport::parse_hash_algorithm(&dg_algo)?;
+        let parsed_oid = extract_oid_from_asn1(&dg_algo_block)?;
+        let parsed_hash_algorithm = HashAlgorithm::from_oid(parsed_oid)?;
 
         let proof_inputs = LiteProofInput {
             dg1_commitment: Vec::from(self.extract_dg1_commitment(profile_key)?),
-            dg1_hash: Vec::from(parsed_hash_algo.get_hash_fixed32(&self.data_group1)),
+            dg1_hash: Vec::from(parsed_hash_algorithm.get_hash_fixed32(&self.data_group1)),
             profile_key: Vec::from(profile_key),
         };
 
-        let proof_provider = ProofProvider::new(proof_inputs, parsed_hash_algo.get_byte_length());
+        let proof_provider =
+            ProofProvider::new(proof_inputs, parsed_hash_algorithm.get_byte_length());
         let register_proof = proof_provider.generate_lite_proof()?;
         return Ok(register_proof);
     }

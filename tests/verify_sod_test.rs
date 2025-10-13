@@ -51,9 +51,7 @@ mod tests {
                 .unwrap(),
         };
 
-        // Вызов verify_sod обернут в spawn_blocking
         let result = tokio::task::spawn_blocking(move || {
-            // здесь будет выполняться blocking код, включая noir_rs
             futures::executor::block_on(rarime.verify_sod(&passport))
         })
         .await
