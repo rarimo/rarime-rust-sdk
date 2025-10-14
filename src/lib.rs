@@ -4,7 +4,9 @@ pub mod rfc;
 
 mod base64;
 mod document;
+mod hash_algorithm;
 mod owned_cert;
+mod signature_algorithm;
 mod treap_tree;
 mod utils;
 
@@ -15,6 +17,7 @@ pub struct RarimeUserConfiguration {
 #[derive(Debug, Clone)]
 pub struct RarimeAPIConfiguration {
     pub json_rpc_evm_url: String,
+    pub rarime_api_url: String,
 }
 
 #[derive(Debug, Clone)]
@@ -69,10 +72,7 @@ impl Rarime {
         Ok(result)
     }
 
-    pub fn get_register_proof(
-        &mut self,
-        passport: &RarimePassport,
-    ) -> Result<Vec<u8>, RarimeError> {
+    fn get_register_proof(&mut self, passport: &RarimePassport) -> Result<Vec<u8>, RarimeError> {
         let private_key: [u8; 32] = match self.config.user_configuration.user_private_key.clone() {
             Some(key) => key,
             None => {
@@ -88,6 +88,50 @@ impl Rarime {
 
         Ok(result)
     }
+
+    pub async fn light_registration(
+        &mut self,
+        passport: &RarimePassport,
+    ) -> Result<VerifySodResponse, RarimeError> {
+        let api_provider = ApiProvider::new(&self.config.api_configuration.rarime_api_url)?;
+
+        let verify_sod_request = VerifySodRequest {
+            data: Data {
+                id: "".to_string(),
+                type_name: "register".to_string(),
+                attributes: Attributes {
+                    document_sod: DocumentSod {
+                        hash_algorithm: passport.get_dg_hash_algorithm()?.to_string(),
+                        signature_algorithm: passport.get_signature_algorithm()?.to_string(),
+                        signed_attributes: hex::encode(to_der(
+                            &passport.extract_signed_attributes()?,
+                        )?),
+                        encapsulated_content: hex::encode(to_der(
+                            &passport.extract_encapsulated_content()?,
+                        )?),
+                        signature: hex::encode(&passport.extract_signature()?),
+                        aa_signature: match &passport.aa_signature {
+                            Some(value) => hex::encode(value),
+                            None => "".to_string(),
+                        },
+                        pem_file: passport.get_certificate_pem()?,
+                        dg15: match &passport.data_group15 {
+                            Some(value) => hex::encode(value),
+                            None => "".to_string(),
+                        },
+                        sod: hex::encode(&passport.sod),
+                    },
+                    zk_proof: ZkProof {
+                        proof: self.get_register_proof(passport)?,
+                    },
+                },
+            },
+        };
+
+        let verify_sod_response = api_provider.verify_sod(&verify_sod_request).await?;
+
+        return Ok(verify_sod_response);
+    }
 }
 
 pub struct RarimeUtils {}
@@ -102,9 +146,15 @@ pub use crate::document::DocumentStatus;
 use crate::document::get_document_status;
 use crate::utils::get_profile_key;
 use ::base64::DecodeError;
+use api::ApiProvider;
+use api::errors::ApiError;
+use api::types::verify_sod::{
+    Attributes, Data, DocumentSod, VerifySodRequest, VerifySodResponse, ZkProof,
+};
 use contracts::{ContractsError, ContractsProviderConfig};
 pub use document::RarimePassport;
 use proofs::ProofError;
+use simple_asn1::to_der;
 use thiserror::Error;
 pub use utils::rarime_utils;
 
@@ -142,7 +192,7 @@ pub enum RarimeError {
     PoseidonHashError(String),
     #[error("Contract error: {0}")]
     ContractCallError(#[from] ContractsError),
-    #[error("{0}")]
+    #[error("ASN1 routing error: {0}")]
     ASN1RouteError(String),
     #[error("Empty DER data: expected at least one block")]
     EmptyDer,
@@ -156,4 +206,6 @@ pub enum RarimeError {
     OIDError(const_oid::Error),
     #[error("Generate proof error: {0}")]
     ProveError(#[from] ProofError),
+    #[error("Api call error: {0}")]
+    ApiError(#[from] ApiError),
 }
