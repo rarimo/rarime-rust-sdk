@@ -12,7 +12,7 @@ mod utils;
 
 #[derive(Debug, Clone)]
 pub struct RarimeUserConfiguration {
-    pub user_private_key: Option<[u8; 32]>,
+    pub user_private_key: [u8; 32],
 }
 #[derive(Debug, Clone)]
 pub struct RarimeAPIConfiguration {
@@ -54,14 +54,7 @@ impl Rarime {
                 .clone(),
         };
 
-        let private_key: [u8; 32] = match self.config.user_configuration.user_private_key.clone() {
-            Some(key) => key,
-            None => {
-                let new_key = RarimeUtils::generate_bjj_private_key()?;
-                self.config.user_configuration.user_private_key = Some(new_key);
-                new_key
-            }
-        };
+        let private_key: [u8; 32] = self.config.user_configuration.user_private_key.clone();
 
         let profile_key = get_profile_key(&private_key)?;
 
@@ -73,14 +66,7 @@ impl Rarime {
     }
 
     fn get_register_proof(&mut self, passport: &RarimePassport) -> Result<Vec<u8>, RarimeError> {
-        let private_key: [u8; 32] = match self.config.user_configuration.user_private_key.clone() {
-            Some(key) => key,
-            None => {
-                let new_key = RarimeUtils::generate_bjj_private_key()?;
-                self.config.user_configuration.user_private_key = Some(new_key);
-                new_key
-            }
-        };
+        let private_key: [u8; 32] = self.config.user_configuration.user_private_key.clone();
 
         let profile_key = get_profile_key(&private_key)?;
 
