@@ -99,7 +99,7 @@ We welcome and appreciate all contributions!
    ```
 4. **Push** your branch
    ```bash
-   git push origin feature/AmazingFeature
+   git push origin feature/your-feature-name
    ```
 5. **Open a Pull Request**
 
