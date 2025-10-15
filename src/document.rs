@@ -739,13 +739,24 @@ impl RarimePassport {
                 ));
             }
         };
-        let encapsulated_content = encapsulated_content_wrapper_content
+        let encapsulated_content_blocks = encapsulated_content_wrapper_content
             .iter()
-            .find(|b| matches!(b, ASN1Block::Explicit(_, _, tag, _) if *tag == BigUint::from(0u32)))
+            .find_map(|b| {
+                if let ASN1Block::Explicit(_, _, tag, inner_blocks) = b {
+                    if *tag == BigUint::from(0u32) {
+                        Some(inner_blocks.clone())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
             .ok_or(RarimeError::ASN1RouteError(
                 "No encapsulated_content block found".to_string(),
             ))?;
-        return Ok(encapsulated_content.clone());
+
+        return Ok(*encapsulated_content_blocks.clone());
     }
 
     pub fn get_signature_algorithm(&self) -> Result<SignatureAlgorithm, RarimeError> {
@@ -896,29 +907,39 @@ impl RarimePassport {
                 ));
             }
         };
-        let tagged0 = inner_seq
+        let tagged0_ref = inner_seq
             .iter()
             .find_map(|b| {
-                if let ASN1Block::Explicit(_, _, tag, content) = b
+                if let ASN1Block::Explicit(_, _, tag, _) = b
                     && *tag == BigUint::from(0u32)
                 {
-                    return Some(content.as_ref());
+                    return Some(b);
                 }
                 None
             })
-            .ok_or(RarimeError::ASN1RouteError(
-                "No [0] tagged block found in SEQUENCE".to_string(),
-            ))?;
+            .ok_or_else(|| {
+                RarimeError::ASN1RouteError("No [0] tagged block found in SEQUENCE".to_string())
+            })?;
 
-        let inner_seq = match tagged0 {
-            ASN1Block::Sequence(_, inner) => inner,
+        let inner_seq_block = match tagged0_ref {
+            ASN1Block::Explicit(_, _, _, content_box) => {
+                let inner_block = content_box.as_ref();
+                match inner_block {
+                    ASN1Block::Sequence(_, _) => inner_block.clone(),
+                    _ => {
+                        return Err(RarimeError::ASN1RouteError(
+                            "Expected SEQUENCE inside [0]".to_string(),
+                        ));
+                    }
+                }
+            }
             _ => {
                 return Err(RarimeError::ASN1RouteError(
-                    "Expected SEQUENCE inside [0]".to_string(),
+                    "Internal logic error: Expected Explicit block".to_string(),
                 ));
             }
         };
-        Ok(inner_seq[0].clone())
+        Ok(inner_seq_block.clone())
     }
 
     pub fn prove_dg1(&self, profile_key: &[u8; 32]) -> Result<Vec<u8>, RarimeError> {

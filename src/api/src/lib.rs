@@ -28,14 +28,9 @@ impl ApiProvider {
             .join("/integrations/incognito-light-registrator/v1/registerid")
             .map_err(ApiError::UrlError)?;
 
-        let response = self
-            .client
-            .post(url)
-            .json(request)
-            .send()
-            .await?
-            .error_for_status()?;
-
+        let response = self.client.post(url).json(request).send().await?;
+        // .error_for_status()?;
+        dbg!(&response);
         let result: VerifySodResponse = response.json().await?;
 
         Ok(result)
