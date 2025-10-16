@@ -29,10 +29,16 @@ impl ApiProvider {
             .map_err(ApiError::UrlError)?;
 
         let response = self.client.post(url).json(request).send().await?;
-        // .error_for_status()?;
-        dbg!(&response);
-        let result: VerifySodResponse = response.json().await?;
 
-        Ok(result)
+        let status = response.status();
+
+        if status.is_success() {
+            let result: VerifySodResponse = response.json().await?;
+            return Ok(result);
+        }
+
+        let error_body = response.text().await?;
+
+        Err(ApiError::HttpError { body: error_body })
     }
 }

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-//request types
+///Request types
 
 #[derive(Serialize, Debug)]
 pub struct DocumentSod {
@@ -34,7 +34,7 @@ pub struct VerifySodRequest {
     pub data: Data,
 }
 
-//response types
+///Response types
 
 #[derive(Deserialize, Debug)]
 pub struct LightRegistrationData {
@@ -55,4 +55,18 @@ pub struct VerifySodResponseData {
 #[derive(Deserialize, Debug)]
 pub struct VerifySodResponse {
     pub data: VerifySodResponseData,
+}
+
+///Error response types
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ErrorDetail {
+    pub title: String,
+    pub detail: Option<String>,
+    pub status: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ErrorResponse {
+    pub errors: Vec<ErrorDetail>,
 }
