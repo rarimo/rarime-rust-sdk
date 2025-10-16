@@ -7,3 +7,6 @@ edition = "2024"
 alloy = { version = "1.0.35", features = ["full"] }
 thiserror = "2.0.16"
 url = "2.5.7"
+
+[patch.crates-io]
+proptest = { git = "https://github.com/proptest-rs/proptest", tag = "v1.6.0" }
