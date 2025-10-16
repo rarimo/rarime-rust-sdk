@@ -72,7 +72,10 @@ impl Rarime {
         Ok(result)
     }
 
-    fn get_register_proof(&mut self, passport: &RarimePassport) -> Result<Vec<u8>, RarimeError> {
+    pub async fn light_registration(
+        &mut self,
+        passport: &RarimePassport,
+    ) -> Result<VerifySodResponse, RarimeError> {
         let private_key: [u8; 32] = match self.config.user_configuration.user_private_key.clone() {
             Some(key) => key,
             None => {
@@ -81,18 +84,6 @@ impl Rarime {
                 new_key
             }
         };
-
-        let profile_key = get_profile_key(&private_key)?;
-
-        let result = passport.prove_dg1(&profile_key)?;
-
-        Ok(result)
-    }
-
-    pub async fn light_registration(
-        &mut self,
-        passport: &RarimePassport,
-    ) -> Result<VerifySodResponse, RarimeError> {
         let api_provider = ApiProvider::new(&self.config.api_configuration.rarime_api_url)?;
 
         let verify_sod_request = VerifySodRequest {
@@ -128,14 +119,10 @@ impl Rarime {
                         },
                         sod: format!("0x{}", hex::encode(&passport.sod).to_uppercase()),
                     },
-                    zk_proof: STANDARD.encode(self.get_register_proof(passport)?),
+                    zk_proof: STANDARD.encode(passport.prove_dg1(&private_key)?),
                 },
             },
         };
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&verify_sod_request).unwrap()
-        );
 
         let verify_sod_response = api_provider.verify_sod(&verify_sod_request).await?;
 
