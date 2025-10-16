@@ -1,4 +1,5 @@
 use crate::errors::ApiError;
+use crate::types::relayer_light_register::{LiteRegisterRequest, LiteRegisterResponse};
 use crate::types::verify_sod::{VerifySodRequest, VerifySodResponse};
 use reqwest::Client;
 use url::Url;
@@ -37,6 +38,28 @@ impl ApiProvider {
             .error_for_status()?;
 
         let result: VerifySodResponse = response.json().await?;
+
+        Ok(result)
+    }
+
+    pub async fn relayer_light_register(
+        &self,
+        request: &LiteRegisterRequest,
+    ) -> Result<LiteRegisterResponse, ApiError> {
+        let url = self
+            .base_url
+            .join("/integrations/registration-relayer/v1/register")
+            .map_err(ApiError::UrlError)?;
+
+        let response = self
+            .client
+            .post(url)
+            .json(request)
+            .send()
+            .await?
+            .error_for_status()?;
+
+        let result: LiteRegisterResponse = response.json().await?;
 
         Ok(result)
     }

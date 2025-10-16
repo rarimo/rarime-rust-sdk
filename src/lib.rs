@@ -1,3 +1,19 @@
+pub use crate::document::DocumentStatus;
+use crate::document::get_document_status;
+use crate::utils::get_profile_key;
+use ::base64::DecodeError;
+use api::ApiProvider;
+use api::errors::ApiError;
+use api::types::relayer_light_register::{LiteRegisterData, LiteRegisterRequest};
+use api::types::verify_sod::{
+    Attributes, Data, DocumentSod, VerifySodRequest, VerifySodResponse, ZkProof,
+};
+use contracts::{ContractsError, ContractsProviderConfig};
+pub use document::RarimePassport;
+use proofs::ProofError;
+use simple_asn1::to_der;
+use thiserror::Error;
+pub use utils::rarime_utils;
 pub mod masters_certificate_pool;
 pub mod passport;
 pub mod rfc;
@@ -23,6 +39,7 @@ pub struct RarimeAPIConfiguration {
 #[derive(Debug, Clone)]
 pub struct RarimeContractsConfiguration {
     pub state_keeper_contract_address: String,
+    pub lite_registration_contract_address: String,
 }
 
 #[derive(Debug, Clone)]
@@ -116,6 +133,24 @@ impl Rarime {
 
         let verify_sod_response = api_provider.verify_sod(&verify_sod_request).await?;
 
+        let calldata: Vec<u8> = vec![];
+
+        let lite_register_transact_request = LiteRegisterRequest {
+            data: LiteRegisterData {
+                tx_data: format!("0x{}", hex::encode(calldata)),
+                no_send: false,
+                destination: self
+                    .config
+                    .contracts_configuration
+                    .lite_registration_contract_address
+                    .clone(),
+            },
+        };
+
+        let verify_sod_response = api_provider
+            .relayer_light_register(&lite_register_transact_request)
+            .await?;
+
         return Ok(verify_sod_response);
     }
 }
@@ -127,22 +162,6 @@ impl RarimeUtils {
         return rarime_utils::generate_bjj_private_key();
     }
 }
-
-pub use crate::document::DocumentStatus;
-use crate::document::get_document_status;
-use crate::utils::get_profile_key;
-use ::base64::DecodeError;
-use api::ApiProvider;
-use api::errors::ApiError;
-use api::types::verify_sod::{
-    Attributes, Data, DocumentSod, VerifySodRequest, VerifySodResponse, ZkProof,
-};
-use contracts::{ContractsError, ContractsProviderConfig};
-pub use document::RarimePassport;
-use proofs::ProofError;
-use simple_asn1::to_der;
-use thiserror::Error;
-pub use utils::rarime_utils;
 
 #[derive(Error, Debug)]
 pub enum RarimeError {
