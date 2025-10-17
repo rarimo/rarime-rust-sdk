@@ -1,5 +1,6 @@
 pub mod call_data_builder;
 mod state_keeper;
+pub mod utils;
 
 use alloy::hex::FromHexError;
 use alloy::sol;
