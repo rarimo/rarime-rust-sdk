@@ -1,3 +1,20 @@
+pub use crate::document::DocumentStatus;
+use crate::document::get_document_status;
+use crate::utils::get_profile_key;
+use ::base64::engine::general_purpose::STANDARD;
+use ::base64::{DecodeError, Engine};
+use api::ApiProvider;
+use api::errors::ApiError;
+use api::types::relayer_light_register::{
+    LiteRegisterData, LiteRegisterRequest, LiteRegisterResponse,
+};
+use api::types::verify_sod::{Attributes, Data, DocumentSod, VerifySodRequest};
+use contracts::{ContractsError, ContractsProviderConfig};
+pub use document::RarimePassport;
+use proofs::ProofError;
+use simple_asn1::to_der;
+use thiserror::Error;
+pub use utils::rarime_utils;
 pub mod masters_certificate_pool;
 pub mod passport;
 pub mod rfc;
@@ -23,6 +40,7 @@ pub struct RarimeAPIConfiguration {
 #[derive(Debug, Clone)]
 pub struct RarimeContractsConfiguration {
     pub state_keeper_contract_address: String,
+    pub register_contract_address: String,
 }
 
 #[derive(Debug, Clone)]
@@ -75,7 +93,7 @@ impl Rarime {
     pub async fn light_registration(
         &mut self,
         passport: &RarimePassport,
-    ) -> Result<VerifySodResponse, RarimeError> {
+    ) -> Result<LiteRegisterResponse, RarimeError> {
         let private_key: [u8; 32] = match self.config.user_configuration.user_private_key.clone() {
             Some(key) => key,
             None => {
@@ -125,8 +143,22 @@ impl Rarime {
         };
 
         let verify_sod_response = api_provider.verify_sod(&verify_sod_request).await?;
-
-        return Ok(verify_sod_response);
+        let call_data = "".to_string(); //TODO
+        let lite_register_request = LiteRegisterRequest {
+            data: LiteRegisterData {
+                tx_data: call_data,
+                no_send: false,
+                destination: self
+                    .config
+                    .contracts_configuration
+                    .register_contract_address
+                    .clone(),
+            },
+        };
+        let lite_register_response = api_provider
+            .relayer_light_register(&lite_register_request)
+            .await?;
+        return Ok(lite_register_response);
     }
 }
 
@@ -137,21 +169,6 @@ impl RarimeUtils {
         return rarime_utils::generate_bjj_private_key();
     }
 }
-
-pub use crate::document::DocumentStatus;
-use crate::document::get_document_status;
-use crate::utils::get_profile_key;
-use ::base64::engine::general_purpose::STANDARD;
-use ::base64::{DecodeError, Engine};
-use api::ApiProvider;
-use api::errors::ApiError;
-use api::types::verify_sod::{Attributes, Data, DocumentSod, VerifySodRequest, VerifySodResponse};
-use contracts::{ContractsError, ContractsProviderConfig};
-pub use document::RarimePassport;
-use proofs::ProofError;
-use simple_asn1::to_der;
-use thiserror::Error;
-pub use utils::rarime_utils;
 
 #[derive(Error, Debug)]
 pub enum RarimeError {
