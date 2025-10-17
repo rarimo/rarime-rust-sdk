@@ -11,11 +11,14 @@ use api::types::relayer_light_register::{
 use api::types::verify_sod::{Attributes, Data, DocumentSod, VerifySodRequest};
 use contracts::RegistrationSimple::{Passport, registerSimpleViaNoirCall};
 use contracts::call_data_builder::CallDataBuilder;
+use contracts::utils::convert_to_u256;
 use contracts::{ContractsError, ContractsProviderConfig};
 pub use document::RarimePassport;
+use hex::FromHexError;
 use proofs::ProofError;
 use simple_asn1::to_der;
 use thiserror::Error;
+
 pub use utils::rarime_utils;
 pub mod masters_certificate_pool;
 pub mod passport;
@@ -105,7 +108,7 @@ impl Rarime {
             }
         };
         let api_provider = ApiProvider::new(&self.config.api_configuration.rarime_api_url)?;
-
+        let proof = passport.prove_dg1(&private_key)?;
         let verify_sod_request = VerifySodRequest {
             data: Data {
                 id: "".to_string(),
@@ -139,7 +142,7 @@ impl Rarime {
                         },
                         sod: format!("0x{}", hex::encode(&passport.sod).to_uppercase()),
                     },
-                    zk_proof: STANDARD.encode(passport.prove_dg1(&private_key)?),
+                    zk_proof: STANDARD.encode(&proof),
                 },
             },
         };
@@ -147,16 +150,22 @@ impl Rarime {
         let verify_sod_response = api_provider.verify_sod(&verify_sod_request).await?;
         let call_data_builder = CallDataBuilder::new();
         let inputs = registerSimpleViaNoirCall {
-            identityKey_: Default::default(),
+            identityKey_: convert_to_u256(&private_key)?,
             passport_: Passport {
-                dgCommit: Default::default(),
-                dg1Hash: Default::default(),
-                publicKey: Default::default(),
-                passportHash: Default::default(),
-                verifier: Default::default(),
+                dgCommit: convert_to_u256(&passport.extract_dg1_commitment(&private_key)?)?,
+                dg1Hash: passport
+                    .get_dg_hash_algorithm()?
+                    .get_hash_fixed32(&passport.data_group1)
+                    .into(),
+                publicKey: passport.get_passport_key()?.into(),
+                passportHash: passport.get_passport_hash()?.into(),
+                verifier: hex::decode(verify_sod_response.data.attributes.verifier)?.as_slice()
+                    [..20]
+                    .try_into()
+                    .expect("Expected a 20-byte slice as verifier address"),
             },
-            signature_: Default::default(),
-            zkPoints_: Default::default(),
+            signature_: hex::decode(&verify_sod_response.data.attributes.signature)?.into(),
+            zkPoints_: proof.into(),
         };
         let call_data = call_data_builder.build_noir_lite_register_call_data(inputs)?;
         let lite_register_request = LiteRegisterRequest {
@@ -236,4 +245,6 @@ pub enum RarimeError {
     ProveError(#[from] ProofError),
     #[error("Api call error: {0}")]
     ApiError(#[from] ApiError),
+    #[error("Decode hex error: {0}")]
+    DecodeHexError(#[from] FromHexError),
 }
