@@ -9,6 +9,8 @@ use api::types::relayer_light_register::{
     LiteRegisterData, LiteRegisterRequest, LiteRegisterResponse,
 };
 use api::types::verify_sod::{Attributes, Data, DocumentSod, VerifySodRequest};
+use contracts::RegistrationSimple::{Passport, registerSimpleViaNoirCall};
+use contracts::call_data_builder::CallDataBuilder;
 use contracts::{ContractsError, ContractsProviderConfig};
 pub use document::RarimePassport;
 use proofs::ProofError;
@@ -143,10 +145,23 @@ impl Rarime {
         };
 
         let verify_sod_response = api_provider.verify_sod(&verify_sod_request).await?;
-        let call_data = "".to_string(); //TODO
+        let call_data_builder = CallDataBuilder::new();
+        let inputs = registerSimpleViaNoirCall {
+            identityKey_: Default::default(),
+            passport_: Passport {
+                dgCommit: Default::default(),
+                dg1Hash: Default::default(),
+                publicKey: Default::default(),
+                passportHash: Default::default(),
+                verifier: Default::default(),
+            },
+            signature_: Default::default(),
+            zkPoints_: Default::default(),
+        };
+        let call_data = call_data_builder.build_noir_lite_register_call_data(inputs)?;
         let lite_register_request = LiteRegisterRequest {
             data: LiteRegisterData {
-                tx_data: call_data,
+                tx_data: format!("0x{}", hex::encode(&call_data)),
                 no_send: false,
                 destination: self
                     .config
@@ -158,6 +173,7 @@ impl Rarime {
         let lite_register_response = api_provider
             .relayer_light_register(&lite_register_request)
             .await?;
+
         return Ok(lite_register_response);
     }
 }
