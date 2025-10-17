@@ -52,7 +52,7 @@ mod tests {
 
         let result = rarime.get_identity_status(&passport).await.unwrap();
 
-        println!("{:#?}", result);
+        dbg!(result);
     }
 
     #[tokio::test]
@@ -98,7 +98,7 @@ mod tests {
 
         let result = rarime.get_identity_status(&passport).await.unwrap();
 
-        println!("{:#?}", result);
+        dbg!(result);
     }
 
     #[tokio::test]
@@ -139,6 +139,6 @@ mod tests {
         };
 
         let result = rarime.get_identity_status(&passport).await.unwrap();
-        println!("{:#?}", result);
+        dbg!(result);
     }
 }

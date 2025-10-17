@@ -9,22 +9,20 @@ use thiserror::Error;
 mod utils;
 
 pub struct LiteProofInput {
-    pub dg1_commitment: Vec<u8>,
-    pub dg1_hash: Vec<u8>,
-    pub profile_key: Vec<u8>,
+    pub dg1: Vec<u8>,
+    pub sk: String,
 }
 
 pub struct ProofProvider {
-    inputs: LiteProofInput,
     hash_size: usize,
 }
 
 impl ProofProvider {
-    pub fn new(inputs: LiteProofInput, hash_size: usize) -> Self {
-        Self { inputs, hash_size }
+    pub fn new(hash_size: usize) -> Self {
+        Self { hash_size }
     }
 
-    pub fn generate_lite_proof(&self) -> Result<Vec<u8>, ProofError> {
+    pub fn generate_lite_proof(&self, inputs: LiteProofInput) -> Result<Vec<u8>, ProofError> {
         let path = format!(
             "src/proofs/src/assets/register_lite_{}.json",
             self.hash_size.to_string()
@@ -43,16 +41,13 @@ impl ProofProvider {
         setup_srs(bytecode, None, false).map_err(|e| ProofError::Srs(e))?;
 
         let mut witness_inputs: Vec<String> = Vec::new();
-
-        witness_inputs.extend(bytes_to_string_array(&self.inputs.dg1_commitment)); // dg1_commitment
-        witness_inputs.extend(bytes_to_string_array(&self.inputs.dg1_hash)); // dg1_hash
-        witness_inputs.extend(bytes_to_string_array(&self.inputs.profile_key)); // sk_hash
+        witness_inputs.extend(bytes_to_string_array(&inputs.dg1));
+        witness_inputs.push(inputs.sk);
 
         let witness_input_refs = witness_inputs
             .iter()
             .map(|s| s.as_str())
             .collect::<Vec<_>>();
-
         let initial_witness = from_vec_str_to_witness_map(witness_input_refs.clone())
             .map_err(|e| ProofError::Witness(e))?;
 
@@ -60,7 +55,6 @@ impl ProofProvider {
         // despite the misleading 'ultra_plonk' name
         let (proof, _) = prove_ultra_plonk(bytecode, initial_witness, false)
             .map_err(|e| ProofError::ProvingError(e))?;
-
         return Ok(proof);
     }
 }

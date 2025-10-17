@@ -1,19 +1,3 @@
-pub use crate::document::DocumentStatus;
-use crate::document::get_document_status;
-use crate::utils::get_profile_key;
-use ::base64::DecodeError;
-use api::ApiProvider;
-use api::errors::ApiError;
-use api::types::relayer_light_register::{LiteRegisterData, LiteRegisterRequest};
-use api::types::verify_sod::{
-    Attributes, Data, DocumentSod, VerifySodRequest, VerifySodResponse, ZkProof,
-};
-use contracts::{ContractsError, ContractsProviderConfig};
-pub use document::RarimePassport;
-use proofs::ProofError;
-use simple_asn1::to_der;
-use thiserror::Error;
-pub use utils::rarime_utils;
 pub mod masters_certificate_pool;
 pub mod passport;
 pub mod rfc;
@@ -28,7 +12,7 @@ mod utils;
 
 #[derive(Debug, Clone)]
 pub struct RarimeUserConfiguration {
-    pub user_private_key: [u8; 32],
+    pub user_private_key: Option<[u8; 32]>,
 }
 #[derive(Debug, Clone)]
 pub struct RarimeAPIConfiguration {
@@ -39,7 +23,6 @@ pub struct RarimeAPIConfiguration {
 #[derive(Debug, Clone)]
 pub struct RarimeContractsConfiguration {
     pub state_keeper_contract_address: String,
-    pub lite_registration_contract_address: String,
 }
 
 #[derive(Debug, Clone)]
@@ -71,7 +54,14 @@ impl Rarime {
                 .clone(),
         };
 
-        let private_key: [u8; 32] = self.config.user_configuration.user_private_key.clone();
+        let private_key: [u8; 32] = match self.config.user_configuration.user_private_key.clone() {
+            Some(key) => key,
+            None => {
+                let new_key = RarimeUtils::generate_bjj_private_key()?;
+                self.config.user_configuration.user_private_key = Some(new_key);
+                new_key
+            }
+        };
 
         let profile_key = get_profile_key(&private_key)?;
 
@@ -82,74 +72,59 @@ impl Rarime {
         Ok(result)
     }
 
-    fn get_register_proof(&mut self, passport: &RarimePassport) -> Result<Vec<u8>, RarimeError> {
-        let private_key: [u8; 32] = self.config.user_configuration.user_private_key.clone();
-
-        let profile_key = get_profile_key(&private_key)?;
-
-        let result = passport.prove_dg1(&profile_key)?;
-
-        Ok(result)
-    }
-
     pub async fn light_registration(
         &mut self,
         passport: &RarimePassport,
     ) -> Result<VerifySodResponse, RarimeError> {
+        let private_key: [u8; 32] = match self.config.user_configuration.user_private_key.clone() {
+            Some(key) => key,
+            None => {
+                let new_key = RarimeUtils::generate_bjj_private_key()?;
+                self.config.user_configuration.user_private_key = Some(new_key);
+                new_key
+            }
+        };
         let api_provider = ApiProvider::new(&self.config.api_configuration.rarime_api_url)?;
 
         let verify_sod_request = VerifySodRequest {
             data: Data {
                 id: "".to_string(),
-                type_name: "register".to_string(),
+                type_field: "register".to_string(),
                 attributes: Attributes {
                     document_sod: DocumentSod {
                         hash_algorithm: passport.get_dg_hash_algorithm()?.to_string(),
                         signature_algorithm: passport.get_signature_algorithm()?.to_string(),
-                        signed_attributes: hex::encode(to_der(
-                            &passport.extract_signed_attributes()?,
-                        )?),
-                        encapsulated_content: hex::encode(to_der(
-                            &passport.extract_encapsulated_content()?,
-                        )?),
-                        signature: hex::encode(&passport.extract_signature()?),
-                        aa_signature: match &passport.aa_signature {
-                            Some(value) => hex::encode(value),
-                            None => "".to_string(),
-                        },
+                        signed_attributes: format!(
+                            "0x{}",
+                            hex::encode(to_der(&passport.extract_signed_attributes()?)?)
+                                .to_uppercase()
+                        ),
+                        encapsulated_content: format!(
+                            "0x{}",
+                            &hex::encode(to_der(&passport.extract_encapsulated_content()?)?)
+                                .to_uppercase()[8..]
+                        ),
+                        signature: format!(
+                            "0x{}",
+                            hex::encode(&passport.extract_signature()?).to_uppercase()
+                        ),
                         pem_file: passport.get_certificate_pem()?,
                         dg15: match &passport.data_group15 {
-                            Some(value) => hex::encode(value),
+                            Some(value) => format!("0x{}", hex::encode(value).to_uppercase()),
                             None => "".to_string(),
                         },
-                        sod: hex::encode(&passport.sod),
+                        aa_signature: match &passport.aa_signature {
+                            Some(value) => format!("0x{}", hex::encode(value).to_uppercase()),
+                            None => "".to_string(),
+                        },
+                        sod: format!("0x{}", hex::encode(&passport.sod).to_uppercase()),
                     },
-                    zk_proof: ZkProof {
-                        proof: self.get_register_proof(passport)?,
-                    },
+                    zk_proof: STANDARD.encode(passport.prove_dg1(&private_key)?),
                 },
             },
         };
 
         let verify_sod_response = api_provider.verify_sod(&verify_sod_request).await?;
-
-        let calldata: Vec<u8> = vec![];
-
-        let lite_register_transact_request = LiteRegisterRequest {
-            data: LiteRegisterData {
-                tx_data: format!("0x{}", hex::encode(calldata)),
-                no_send: false,
-                destination: self
-                    .config
-                    .contracts_configuration
-                    .lite_registration_contract_address
-                    .clone(),
-            },
-        };
-
-        let verify_sod_response = api_provider
-            .relayer_light_register(&lite_register_transact_request)
-            .await?;
 
         return Ok(verify_sod_response);
     }
@@ -162,6 +137,21 @@ impl RarimeUtils {
         return rarime_utils::generate_bjj_private_key();
     }
 }
+
+pub use crate::document::DocumentStatus;
+use crate::document::get_document_status;
+use crate::utils::get_profile_key;
+use ::base64::engine::general_purpose::STANDARD;
+use ::base64::{DecodeError, Engine};
+use api::ApiProvider;
+use api::errors::ApiError;
+use api::types::verify_sod::{Attributes, Data, DocumentSod, VerifySodRequest, VerifySodResponse};
+use contracts::{ContractsError, ContractsProviderConfig};
+pub use document::RarimePassport;
+use proofs::ProofError;
+use simple_asn1::to_der;
+use thiserror::Error;
+pub use utils::rarime_utils;
 
 #[derive(Error, Debug)]
 pub enum RarimeError {
