@@ -8,6 +8,6 @@ pub enum ApiError {
     #[error("Failed to parse URL: {0}")]
     UrlError(#[from] url::ParseError),
 
-    #[error("Server returned an application error: {0}")]
-    ServerError(String),
+    #[error("Error response: {body}")]
+    HttpError { body: String },
 }

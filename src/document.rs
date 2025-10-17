@@ -1,18 +1,12 @@
 use crate::RarimeError;
-use crate::RarimeError::PoseidonHashError;
 use crate::hash_algorithm::HashAlgorithm;
 use crate::signature_algorithm::SignatureAlgorithm;
-use crate::utils::{
-    big_int_to_32_bytes, convert_asn1_to_pem, extract_oid_from_asn1, poseidon_hash_32_bytes,
-};
+use crate::utils::{convert_asn1_to_pem, extract_oid_from_asn1, poseidon_hash_32_bytes};
 use contracts::{ContractsProvider, ContractsProviderConfig};
-use ff::{PrimeField, PrimeFieldRepr};
 use num_bigint::BigInt;
 use num_traits::{One, Zero};
-use poseidon_rs::{Fr, Poseidon};
 use proofs::{LiteProofInput, ProofProvider};
 use simple_asn1::{ASN1Block, ASN1Class, BigUint, from_der, to_der};
-use std::io::Cursor;
 
 enum ActiveAuthKey {
     Rsa { modulus: BigInt, exponent: BigInt },
@@ -72,85 +66,6 @@ impl RarimePassport {
         let passport_key = self.get_passport_hash()?;
 
         Ok(passport_key)
-    }
-
-    /// Extracts and computes a cryptographic commitment from `data_group1`
-    /// using the provided secret identity key `sk_identity`.
-    ///
-    /// # Description
-    /// This function performs the following steps:
-    /// 1. Splits the binary data in `data_group1` into 4 chunks.
-    /// 2. Each chunk is interpreted as a large integer (`BigInt`) built bit by bit.
-    /// 3. Each of these four big integers is converted into a field element.
-    /// 4. The `sk_identity` (32-byte private key) is also converted into an `Fr` element.
-    /// 5. The private key is hashed using the Poseidon hash function, and the resulting field element
-    ///    is appended to the list of field elements.
-    /// 6. All collected field elements are then hashed again using Poseidon to produce the final commitment.
-    /// 7. The resulting field element is converted back into a 32-byte array and returned.
-    ///
-    pub fn extract_dg1_commitment(&self, sk_identity: &[u8; 32]) -> Result<[u8; 32], RarimeError> {
-        let chunk_len = &self.data_group1.len() * 2;
-        let mut vec_fr = vec![];
-
-        for i in 0..4 {
-            let start_bit = i * chunk_len;
-            let mut chunk = BigInt::from(0u64);
-            let mut current = BigInt::from(1u64);
-            let two = BigInt::from(2u64);
-
-            for bit_pos in 0..chunk_len {
-                let global_bit_idx = start_bit + bit_pos;
-                let byte_idx = global_bit_idx / 8;
-                let bit_in_byte = global_bit_idx % 8;
-                let byte = &self.data_group1[byte_idx];
-                let bit_is_set = ((byte >> bit_in_byte) & 1) != 0;
-                if bit_is_set {
-                    let tmp = current.clone();
-                    chunk += tmp;
-                }
-                // current *= 2
-                let mut new_current = current;
-                new_current *= two.clone();
-                current = new_current;
-            }
-            let bytes = big_int_to_32_bytes(&chunk);
-            let mut repr = poseidon_rs::FrRepr::default();
-
-            let mut cursor = Cursor::new(&bytes);
-            repr.read_be(&mut cursor)
-                .expect("error convert BigInt to Fr ");
-            vec_fr.push(Fr::from_repr(repr).expect("error converting repr to Fr"));
-        }
-
-        let mut repr = poseidon_rs::FrRepr::default();
-
-        let mut cursor = Cursor::new(&sk_identity);
-        repr.read_be(&mut cursor)
-            .expect("error convert BigInt to Fr ");
-
-        let sk_fr = Fr::from_repr(repr).expect("error converting Repr to Fr");
-
-        let poseidon_hasher = Poseidon::new();
-
-        let inner = poseidon_hasher
-            .hash(vec![sk_fr])
-            .map_err(PoseidonHashError)?;
-        vec_fr.push(inner);
-
-        let hash_result: Fr = poseidon_hasher.hash(vec_fr).map_err(PoseidonHashError)?;
-
-        let repr = hash_result.into_repr();
-
-        let mut raw_hash_bytes = Vec::new();
-
-        repr.write_be(&mut raw_hash_bytes)
-            .expect("Error converting repr to bytes");
-
-        let result_big_int = BigInt::from_bytes_be(num_bigint::Sign::Plus, &raw_hash_bytes);
-
-        let big_int_32 = big_int_to_32_bytes(&result_big_int);
-
-        return Ok(big_int_32);
     }
 
     fn get_passport_hash(&self) -> Result<[u8; 32], RarimeError> {
@@ -739,13 +654,24 @@ impl RarimePassport {
                 ));
             }
         };
-        let encapsulated_content = encapsulated_content_wrapper_content
+        let encapsulated_content_blocks = encapsulated_content_wrapper_content
             .iter()
-            .find(|b| matches!(b, ASN1Block::Explicit(_, _, tag, _) if *tag == BigUint::from(0u32)))
+            .find_map(|b| {
+                if let ASN1Block::Explicit(_, _, tag, inner_blocks) = b {
+                    if *tag == BigUint::from(0u32) {
+                        Some(inner_blocks.clone())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
             .ok_or(RarimeError::ASN1RouteError(
                 "No encapsulated_content block found".to_string(),
             ))?;
-        return Ok(encapsulated_content.clone());
+
+        return Ok(*encapsulated_content_blocks.clone());
     }
 
     pub fn get_signature_algorithm(&self) -> Result<SignatureAlgorithm, RarimeError> {
@@ -896,46 +822,54 @@ impl RarimePassport {
                 ));
             }
         };
-        let tagged0 = inner_seq
+        let tagged0_ref = inner_seq
             .iter()
             .find_map(|b| {
-                if let ASN1Block::Explicit(_, _, tag, content) = b
+                if let ASN1Block::Explicit(_, _, tag, _) = b
                     && *tag == BigUint::from(0u32)
                 {
-                    return Some(content.as_ref());
+                    return Some(b);
                 }
                 None
             })
-            .ok_or(RarimeError::ASN1RouteError(
-                "No [0] tagged block found in SEQUENCE".to_string(),
-            ))?;
+            .ok_or_else(|| {
+                RarimeError::ASN1RouteError("No [0] tagged block found in SEQUENCE".to_string())
+            })?;
 
-        let inner_seq = match tagged0 {
-            ASN1Block::Sequence(_, inner) => inner,
+        let inner_seq_block = match tagged0_ref {
+            ASN1Block::Explicit(_, _, _, content_box) => {
+                let inner_block = content_box.as_ref();
+                match inner_block {
+                    ASN1Block::Sequence(_, _) => inner_block.clone(),
+                    _ => {
+                        return Err(RarimeError::ASN1RouteError(
+                            "Expected SEQUENCE inside [0]".to_string(),
+                        ));
+                    }
+                }
+            }
             _ => {
                 return Err(RarimeError::ASN1RouteError(
-                    "Expected SEQUENCE inside [0]".to_string(),
+                    "Internal logic error: Expected Explicit block".to_string(),
                 ));
             }
         };
-        Ok(inner_seq[0].clone())
+        Ok(inner_seq_block.clone())
     }
 
-    pub fn prove_dg1(&self, profile_key: &[u8; 32]) -> Result<Vec<u8>, RarimeError> {
+    pub fn prove_dg1(&self, private_key: &[u8; 32]) -> Result<Vec<u8>, RarimeError> {
         let dg_algo_block = &self.extract_dg_hash_algo_block()?;
 
         let parsed_oid = extract_oid_from_asn1(&dg_algo_block)?;
         let parsed_hash_algorithm = HashAlgorithm::from_oid(parsed_oid)?;
-
         let proof_inputs = LiteProofInput {
-            dg1_commitment: Vec::from(self.extract_dg1_commitment(profile_key)?),
-            dg1_hash: Vec::from(parsed_hash_algorithm.get_hash_fixed32(&self.data_group1)),
-            profile_key: Vec::from(profile_key),
+            dg1: self.data_group1.clone(),
+            sk: hex::encode(private_key),
         };
 
-        let proof_provider =
-            ProofProvider::new(proof_inputs, parsed_hash_algorithm.get_byte_length());
-        let register_proof = proof_provider.generate_lite_proof()?;
+        let proof_provider = ProofProvider::new(parsed_hash_algorithm.get_byte_length());
+        let register_proof = proof_provider.generate_lite_proof(proof_inputs)?;
+
         return Ok(register_proof);
     }
 }

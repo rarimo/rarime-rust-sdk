@@ -141,12 +141,7 @@ pub fn convert_asn1_to_pem(asn1_block: &ASN1Block) -> Result<String, RarimeError
         .map(|chunk| format!("{}\n", String::from_utf8_lossy(chunk)))
         .collect::<String>();
 
-    let pem_string = format!(
-        "{}{}{}",
-        pem_header,
-        formatted_base64.trim_end(),
-        pem_footer
-    );
+    let pem_string = format!("{}{}{}", pem_header, formatted_base64, pem_footer);
 
     Ok(pem_string)
 }

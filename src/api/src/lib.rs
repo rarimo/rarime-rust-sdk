@@ -28,16 +28,17 @@ impl ApiProvider {
             .join("/integrations/incognito-light-registrator/v1/registerid")
             .map_err(ApiError::UrlError)?;
 
-        let response = self
-            .client
-            .post(url)
-            .json(request)
-            .send()
-            .await?
-            .error_for_status()?;
+        let response = self.client.post(url).json(request).send().await?;
 
-        let result: VerifySodResponse = response.json().await?;
+        let status = response.status();
 
-        Ok(result)
+        if status.is_success() {
+            let result: VerifySodResponse = response.json().await?;
+            return Ok(result);
+        }
+
+        let error_body = response.text().await?;
+
+        Err(ApiError::HttpError { body: error_body })
     }
 }
