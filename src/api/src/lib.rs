@@ -52,16 +52,17 @@ impl ApiProvider {
             .join("/integrations/registration-relayer/v1/register")
             .map_err(ApiError::UrlError)?;
 
-        let response = self
-            .client
-            .post(url)
-            .json(request)
-            .send()
-            .await?
-            .error_for_status()?;
+        let response = self.client.post(url).json(request).send().await?;
 
-        let result: LiteRegisterResponse = response.json().await?;
+        let status = response.status();
 
-        Ok(result)
+        if status.is_success() {
+            let result: LiteRegisterResponse = response.json().await?;
+            return Ok(result);
+        }
+
+        let error_body = response.text().await?;
+
+        Err(ApiError::HttpError { body: error_body })
     }
 }
