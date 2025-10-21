@@ -20,6 +20,7 @@ pub enum DocumentStatus {
     RegisteredWithOtherPk,
 }
 
+#[derive(Clone)]
 pub struct RarimePassport {
     pub data_group1: Vec<u8>,
     pub data_group15: Option<Vec<u8>>,
