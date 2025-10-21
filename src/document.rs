@@ -949,7 +949,6 @@ impl RarimePassport {
             sk: BigUint::from_bytes_be(private_key).to_str_radix(10),
         };
 
-        dbg!(&proof_inputs);
         let proof_provider = ProofProvider::new(parsed_hash_algorithm.get_byte_length());
         let register_proof = proof_provider.generate_lite_proof(proof_inputs)?;
 
