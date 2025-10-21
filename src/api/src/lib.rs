@@ -55,7 +55,7 @@ impl ApiProvider {
         let response = self.client.post(url).json(request).send().await?;
 
         let status = response.status();
-
+        dbg!(&response);
         if status.is_success() {
             let result: LiteRegisterResponse = response.json().await?;
             return Ok(result);

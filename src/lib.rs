@@ -1,6 +1,5 @@
 pub use crate::document::DocumentStatus;
 use crate::document::get_document_status;
-use crate::utils::get_profile_key;
 use ::base64::engine::general_purpose::STANDARD;
 use ::base64::{DecodeError, Engine};
 use api::ApiProvider;
@@ -86,7 +85,7 @@ impl Rarime {
             }
         };
 
-        let profile_key = get_profile_key(&private_key)?;
+        let profile_key = rarime_utils::get_profile_key(&private_key)?;
 
         let passport_key = passport.get_passport_key()?;
 
@@ -148,25 +147,43 @@ impl Rarime {
         };
 
         let verify_sod_response = api_provider.verify_sod(&verify_sod_request).await?;
+        dbg!(&verify_sod_response);
+        dbg!(hex::encode(&proof[0..32]).to_uppercase());
+        dbg!(hex::encode(&proof[32..64]).to_uppercase());
+        dbg!(hex::encode(&proof[64..96]).to_uppercase());
+        dbg!(hex::encode(&passport.extract_dg1_commitment(&private_key)?).to_uppercase());
         let call_data_builder = CallDataBuilder::new();
         let inputs = registerSimpleViaNoirCall {
-            identityKey_: convert_to_u256(&private_key)?,
+            identityKey_: convert_to_u256(&RarimeUtils::get_profile_key(&private_key)?)?,
             passport_: Passport {
-                dgCommit: convert_to_u256(&passport.extract_dg1_commitment(&private_key)?)?,
-                dg1Hash: passport
-                    .get_dg_hash_algorithm()?
-                    .get_hash_fixed32(&passport.data_group1)
-                    .into(),
-                publicKey: passport.get_passport_key()?.into(),
+                dgCommit: convert_to_u256(&proof[..32].try_into().unwrap())?,
+                //convert_to_u256(&passport.extract_dg1_commitment(&private_key)?)?,
+                dg1Hash: convert_to_u256(&proof[32..64].try_into().unwrap())?.into(),
+                // passport
+                //     .get_dg_hash_algorithm()?
+                //     .get_hash_fixed32(&passport.data_group1)
+                //     .into(),
+                publicKey: //hex::decode(verify_sod_response.data.attributes.public_key.chars()[2..34]).into(),
+                // [0u8; 32].into(),
+                passport.get_passport_key()?.into(),
                 passportHash: passport.get_passport_hash()?.into(),
-                verifier: hex::decode(verify_sod_response.data.attributes.verifier)?.as_slice()
-                    [..20]
+                verifier: hex::decode(
+                    verify_sod_response
+                        .data
+                        .attributes
+                        .verifier
+                        .chars()
+                        .skip(2)
+                        .collect::<String>(),
+                )?
+                    .as_slice()
                     .try_into()
                     .expect("Expected a 20-byte slice as verifier address"),
             },
-            signature_: hex::decode(&verify_sod_response.data.attributes.signature)?.into(),
-            zkPoints_: proof.into(),
+            signature_: hex::decode(&verify_sod_response.data.attributes.signature[2..])?.into(),
+            zkPoints_: proof[96..].to_vec().into(),
         };
+        dbg!(&inputs);
         let call_data = call_data_builder.build_noir_lite_register_call_data(inputs)?;
         let lite_register_request = LiteRegisterRequest {
             data: LiteRegisterData {
@@ -192,6 +209,10 @@ pub struct RarimeUtils {}
 impl RarimeUtils {
     pub fn generate_bjj_private_key() -> Result<[u8; 32], RarimeError> {
         return rarime_utils::generate_bjj_private_key();
+    }
+
+    pub fn get_profile_key(private_key: &[u8; 32]) -> Result<[u8; 32], RarimeError> {
+        return rarime_utils::get_profile_key(&private_key);
     }
 }
 
