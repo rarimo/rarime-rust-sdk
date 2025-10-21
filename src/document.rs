@@ -159,8 +159,7 @@ impl RarimePassport {
         let parsed_oid = extract_oid_from_asn1(&hash_block)?;
         let parsed_hash_algorithm = HashAlgorithm::from_oid(parsed_oid)?;
 
-        let sign_attr_bytes =
-            to_der(&sign_attr).map_err(|e| RarimeError::DerError(e.to_string()))?;
+        let sign_attr_bytes = to_der(&sign_attr).map_err(|e| RarimeError::ASN1EncodeError(e))?;
 
         let hash = parsed_hash_algorithm.get_hash_fixed32(&sign_attr_bytes);
 
@@ -244,7 +243,7 @@ impl RarimePassport {
     }
 
     pub fn extract_signature(&self) -> Result<Vec<u8>, RarimeError> {
-        let blocks = from_der(&self.sod).map_err(|e| RarimeError::DerError(e.to_string()))?;
+        let blocks = from_der(&self.sod).map_err(|e| RarimeError::ASN1DecodeError(e))?;
 
         let app23_seq = match &blocks[0] {
             ASN1Block::Explicit(class, _, tag, content)
@@ -321,7 +320,7 @@ impl RarimePassport {
 
     fn extract_dg_hash_algo_block(&self) -> Result<ASN1Block, RarimeError> {
         let sod_bytes = &self.sod;
-        let blocks = from_der(sod_bytes).map_err(|e| RarimeError::DerError(e.to_string()))?;
+        let blocks = from_der(sod_bytes).map_err(|e| RarimeError::ASN1DecodeError(e))?;
 
         let app23_block = blocks
             .iter()
@@ -420,7 +419,7 @@ impl RarimePassport {
 
     pub fn extract_dg_hash_algo(&self) -> Result<ASN1Block, RarimeError> {
         let sod_bytes = &self.sod;
-        let blocks = from_der(sod_bytes).map_err(|e| RarimeError::DerError(e.to_string()))?;
+        let blocks = from_der(sod_bytes).map_err(|e| RarimeError::ASN1DecodeError(e))?;
 
         let app23_block = blocks
             .iter()
@@ -518,7 +517,7 @@ impl RarimePassport {
     }
 
     fn parse_dg15_pubkey(dg15_bytes: &[u8]) -> Result<ActiveAuthKey, RarimeError> {
-        let blocks = from_der(dg15_bytes).map_err(|e| RarimeError::DerError(e.to_string()))?;
+        let blocks = from_der(dg15_bytes).map_err(|e| RarimeError::ASN1DecodeError(e))?;
 
         let seq = match &blocks[0] {
             ASN1Block::Sequence(_, inner) => inner,
@@ -579,7 +578,7 @@ impl RarimePassport {
     }
 
     pub fn extract_signed_attributes(&self) -> Result<ASN1Block, RarimeError> {
-        let blocks = from_der(&self.sod).map_err(|e| RarimeError::DerError(e.to_string()))?;
+        let blocks = from_der(&self.sod).map_err(|e| RarimeError::ASN1DecodeError(e))?;
         let root = blocks.first().ok_or(RarimeError::EmptyDer)?;
 
         let app23_seq = match root {
@@ -621,7 +620,7 @@ impl RarimePassport {
                     other => vec![other.clone()],
                 },
                 ASN1Block::Unknown(_, _, _, _tag, raw_bytes) => {
-                    from_der(raw_bytes).map_err(|e| RarimeError::DerError(e.to_string()))?
+                    from_der(raw_bytes).map_err(|e| RarimeError::ASN1DecodeError(e))?
                 }
                 other => match other {
                     ASN1Block::Sequence(_, v) => v.clone(),
@@ -688,7 +687,7 @@ impl RarimePassport {
     }
 
     pub fn extract_encapsulated_content(&self) -> Result<ASN1Block, RarimeError> {
-        let blocks = from_der(&self.sod).map_err(|e| RarimeError::DerError(e.to_string()))?;
+        let blocks = from_der(&self.sod).map_err(|e| RarimeError::ASN1DecodeError(e))?;
         let app23_block = blocks.iter().find(|b| { matches!(b, ASN1Block::Explicit(class, _, tag, _) if *class == ASN1Class::Application && *tag == BigUint::from(23u32)) }).ok_or(RarimeError::ASN1RouteError("Expected Application 23 SEQUENCE in the root".to_string()))?;
         let seq_in_app23 = match app23_block {
             ASN1Block::Explicit(_, _, _, content) => match content.as_ref() {
@@ -766,7 +765,7 @@ impl RarimePassport {
     }
 
     fn extract_passport_signature_block(&self) -> Result<ASN1Block, RarimeError> {
-        let blocks = from_der(&self.sod).map_err(|e| RarimeError::DerError(e.to_string()))?;
+        let blocks = from_der(&self.sod).map_err(|e| RarimeError::ASN1DecodeError(e))?;
 
         let app23_seq = match &blocks[0] {
             ASN1Block::Explicit(class, _, tag, content)
@@ -830,7 +829,6 @@ impl RarimePassport {
             .iter()
             .find_map(|b| {
                 if let ASN1Block::Sequence(_, inner) = b
-                    && inner.len() == 2
                     && let ASN1Block::ObjectIdentifier(tag, oid) = &inner[0]
                 {
                     let oid_string = oid
@@ -862,7 +860,7 @@ impl RarimePassport {
     }
 
     pub fn extract_certificate(&self) -> Result<ASN1Block, RarimeError> {
-        let blocks = from_der(&self.sod).map_err(|e| RarimeError::DerError(e.to_string()))?;
+        let blocks = from_der(&self.sod).map_err(|e| RarimeError::ASN1DecodeError(e))?;
 
         let app23_seq = match &blocks[0] {
             ASN1Block::Explicit(class, _, tag, content)
@@ -948,9 +946,10 @@ impl RarimePassport {
         let parsed_hash_algorithm = HashAlgorithm::from_oid(parsed_oid)?;
         let proof_inputs = LiteProofInput {
             dg1: self.data_group1.clone(),
-            sk: hex::encode(private_key),
+            sk: BigUint::from_bytes_be(private_key).to_str_radix(10),
         };
 
+        dbg!(&proof_inputs);
         let proof_provider = ProofProvider::new(parsed_hash_algorithm.get_byte_length());
         let register_proof = proof_provider.generate_lite_proof(proof_inputs)?;
 
