@@ -46,16 +46,15 @@ mod tests {
                 .decode(json_value.get("sod").unwrap().as_str().unwrap())
                 .unwrap(),
         };
-        // Блокирующая функция выполняется в отдельном потоке
+
         let proof = tokio::task::spawn_blocking({
             let passport = passport.clone();
             let user_key = rarime_config.user_configuration.user_private_key.clone();
             move || passport.prove_dg1(&user_key).unwrap()
         })
         .await
-        .unwrap(); // unwrap на JoinError
+        .unwrap();
 
-        // Асинхронная функция вызывается как обычно
         let result = rarime.verify_sod(&passport, &proof).await.unwrap();
 
         dbg!(result);
