@@ -25,7 +25,7 @@ mod tests {
                 rarime_api_url: "https://api.orgs.app.stage.rarime.com".to_string(),
             },
             user_configuration: RarimeUserConfiguration {
-                user_private_key: Some(RarimeUtils::generate_bjj_private_key().unwrap()),
+                user_private_key: RarimeUtils::generate_bjj_private_key().unwrap(),
             },
         };
 

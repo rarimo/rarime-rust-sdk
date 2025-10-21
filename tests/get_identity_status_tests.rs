@@ -24,12 +24,10 @@ mod tests {
                 rarime_api_url: "https://api.orgs.app.stage.rarime.com".to_string(),
             },
             user_configuration: RarimeUserConfiguration {
-                user_private_key: Some(
-                    <[u8; 32]>::try_from(
-                        hex::decode(json_value.get("pk").unwrap().as_str().unwrap()).unwrap(),
-                    )
-                    .unwrap(),
-                ),
+                user_private_key: <[u8; 32]>::try_from(
+                    hex::decode(json_value.get("pk").unwrap().as_str().unwrap()).unwrap(),
+                )
+                .unwrap(),
             },
         };
 
@@ -71,12 +69,10 @@ mod tests {
                 rarime_api_url: "https://api.orgs.app.stage.rarime.com".to_string(),
             },
             user_configuration: RarimeUserConfiguration {
-                user_private_key: Some(
-                    <[u8; 32]>::try_from(
-                        hex::decode(json_value.get("pk").unwrap().as_str().unwrap()).unwrap(),
-                    )
-                    .unwrap(),
-                ),
+                user_private_key: <[u8; 32]>::try_from(
+                    hex::decode(json_value.get("pk").unwrap().as_str().unwrap()).unwrap(),
+                )
+                .unwrap(),
             },
         };
 
@@ -118,12 +114,10 @@ mod tests {
                 rarime_api_url: "https://api.orgs.app.stage.rarime.com".to_string(),
             },
             user_configuration: RarimeUserConfiguration {
-                user_private_key: Some(
-                    <[u8; 32]>::try_from(
-                        hex::decode(json_value.get("pk").unwrap().as_str().unwrap()).unwrap(),
-                    )
-                    .unwrap(),
-                ),
+                user_private_key: <[u8; 32]>::try_from(
+                    hex::decode(json_value.get("pk").unwrap().as_str().unwrap()).unwrap(),
+                )
+                .unwrap(),
             },
         };
 
