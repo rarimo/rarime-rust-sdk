@@ -10,7 +10,7 @@ mod tests {
     use std::fs;
 
     #[tokio::test]
-    async fn test_verify_sod() {
+    async fn test_light_registration() {
         let json_string = fs::read_to_string("./tests/assets/passports/id_card3.json").unwrap();
         let json_value: Value = serde_json::from_str(&json_string).unwrap();
 
@@ -46,17 +46,12 @@ mod tests {
                 .decode(json_value.get("sod").unwrap().as_str().unwrap())
                 .unwrap(),
         };
-        // Блокирующая функция выполняется в отдельном потоке
-        let proof = tokio::task::spawn_blocking({
-            let passport = passport.clone();
-            let user_key = rarime_config.user_configuration.user_private_key.clone();
-            move || passport.prove_dg1(&user_key).unwrap()
+        let result = tokio::task::spawn_blocking(move || {
+            futures::executor::block_on(rarime.light_registration(&passport))
         })
         .await
-        .unwrap(); // unwrap на JoinError
-
-        // Асинхронная функция вызывается как обычно
-        let result = rarime.verify_sod(&passport, &proof).await.unwrap();
+        .unwrap()
+        .unwrap();
 
         dbg!(result);
     }
