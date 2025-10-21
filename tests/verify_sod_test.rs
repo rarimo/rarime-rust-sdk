@@ -11,8 +11,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_verify_sod() {
-        let json_string =
-            fs::read_to_string("./tests/assets/passports/IVAN_LELE_doc.json").unwrap();
+        let json_string = fs::read_to_string("./tests/assets/passports/id_card3.json").unwrap();
         let json_value: Value = serde_json::from_str(&json_string).unwrap();
 
         let rarime_config = RarimeConfiguration {
@@ -29,10 +28,6 @@ mod tests {
                 user_private_key: Some(RarimeUtils::generate_bjj_private_key().unwrap()),
             },
         };
-
-        dbg!(hex::encode(
-            rarime_config.user_configuration.user_private_key.unwrap()
-        ));
 
         let mut rarime = Rarime::new(rarime_config);
 
