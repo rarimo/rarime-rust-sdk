@@ -8,12 +8,15 @@ pub struct RegisterResponseBody {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LiteRegisterResponse {
+    data: LiteRegisterResponseBody,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LiteRegisterResponseBody {
     pub id: String,
     #[serde(rename = "type")]
     pub type_field: String,
     pub attributes: RegisterResponseAttributes,
 }
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RegisterResponseAttributes {
     pub tx_hash: String,
