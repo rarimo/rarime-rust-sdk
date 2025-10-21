@@ -1,18 +1,12 @@
 use crate::RarimeError;
-use crate::RarimeError::PoseidonHashError;
 use crate::hash_algorithm::HashAlgorithm;
 use crate::signature_algorithm::SignatureAlgorithm;
-use crate::utils::{
-    big_int_to_32_bytes, convert_asn1_to_pem, extract_oid_from_asn1, poseidon_hash_32_bytes,
-};
+use crate::utils::{convert_asn1_to_pem, extract_oid_from_asn1, poseidon_hash_32_bytes};
 use contracts::{ContractsProvider, ContractsProviderConfig};
-use ff::{PrimeField, PrimeFieldRepr};
 use num_bigint::BigInt;
 use num_traits::{One, Zero};
-use poseidon_rs::{Fr, Poseidon};
 use proofs::{LiteProofInput, ProofProvider};
 use simple_asn1::{ASN1Block, ASN1Class, BigUint, from_der, to_der};
-use std::io::Cursor;
 
 enum ActiveAuthKey {
     Rsa { modulus: BigInt, exponent: BigInt },
@@ -56,84 +50,6 @@ pub(crate) async fn get_document_status(
 }
 
 impl RarimePassport {
-    /// Extracts and computes a cryptographic commitment from `data_group1`
-    /// using the provided secret identity key `sk_identity`.
-    ///
-    /// # Description
-    /// This function performs the following steps:
-    /// 1. Splits the binary data in `data_group1` into 4 chunks.
-    /// 2. Each chunk is interpreted as a large integer (`BigInt`) built bit by bit.
-    /// 3. Each of these four big integers is converted into a field element.
-    /// 4. The `sk_identity` (32-byte private key) is also converted into an `Fr` element.
-    /// 5. The private key is hashed using the Poseidon hash function, and the resulting field element
-    ///    is appended to the list of field elements.
-    /// 6. All collected field elements are then hashed again using Poseidon to produce the final commitment.
-    /// 7. The resulting field element is converted back into a 32-byte array and returned.
-    ///
-    pub fn extract_dg1_commitment(&self, sk_identity: &[u8; 32]) -> Result<[u8; 32], RarimeError> {
-        let chunk_len = &self.data_group1.len() * 2;
-        let mut vec_fr = vec![];
-
-        for i in 0..4 {
-            let start_bit = i * chunk_len;
-            let mut chunk = BigInt::from(0u64);
-            let mut current = BigInt::from(1u64);
-            let two = BigInt::from(2u64);
-
-            for bit_pos in 0..chunk_len {
-                let global_bit_idx = start_bit + bit_pos;
-                let byte_idx = global_bit_idx / 8;
-                let bit_in_byte = global_bit_idx % 8;
-                let byte = &self.data_group1[byte_idx];
-                let bit_is_set = ((byte >> bit_in_byte) & 1) != 0;
-                if bit_is_set {
-                    let tmp = current.clone();
-                    chunk += tmp;
-                }
-                // current *= 2
-                let mut new_current = current;
-                new_current *= two.clone();
-                current = new_current;
-            }
-            let bytes = big_int_to_32_bytes(&chunk);
-            let mut repr = poseidon_rs::FrRepr::default();
-
-            let mut cursor = Cursor::new(&bytes);
-            repr.read_be(&mut cursor)
-                .expect("error convert BigInt to Fr ");
-            vec_fr.push(Fr::from_repr(repr).expect("error converting repr to Fr"));
-        }
-
-        let mut repr = poseidon_rs::FrRepr::default();
-
-        let mut cursor = Cursor::new(&sk_identity);
-        repr.read_be(&mut cursor)
-            .expect("error convert BigInt to Fr ");
-
-        let sk_fr = Fr::from_repr(repr).expect("error converting Repr to Fr");
-
-        let poseidon_hasher = Poseidon::new();
-
-        let inner = poseidon_hasher
-            .hash(vec![sk_fr])
-            .map_err(PoseidonHashError)?;
-        vec_fr.push(inner);
-
-        let hash_result: Fr = poseidon_hasher.hash(vec_fr).map_err(PoseidonHashError)?;
-
-        let repr = hash_result.into_repr();
-
-        let mut raw_hash_bytes = Vec::new();
-
-        repr.write_be(&mut raw_hash_bytes)
-            .expect("Error converting repr to bytes");
-
-        let result_big_int = BigInt::from_bytes_be(num_bigint::Sign::Plus, &raw_hash_bytes);
-
-        let big_int_32 = big_int_to_32_bytes(&result_big_int);
-
-        return Ok(big_int_32);
-    }
     pub(crate) fn get_passport_key(&self) -> Result<[u8; 32], RarimeError> {
         if let Some(dg15_bytes) = &self.data_group15 {
             let key = Self::parse_dg15_pubkey(dg15_bytes)?;
