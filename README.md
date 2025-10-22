@@ -62,7 +62,7 @@ cargo install uniffi_bindgen --version <USED_VERSION>
 
 ```bash
 # Clone the repository
-git clone https://github.com/<YOUR_USERNAME>/rarime-rust-sdk.git
+git clone https://github.com/rarimo/rarime-rust-sdk.git
 cd rarime-rust-sdk
 
 # Build the Rust library
