@@ -1,8 +1,24 @@
+pub mod call_data_builder;
 mod state_keeper;
+pub mod utils;
 
 use alloy::hex::FromHexError;
 use alloy::sol;
 use thiserror::Error;
+
+sol!(
+    #[sol(rpc)]
+    #[derive(Debug)]
+    StateKeeper,
+    "src/abi/StateKeeper.json"
+);
+
+sol!(
+    #[sol(rpc)]
+    #[derive(Debug)]
+    RegistrationSimple,
+    "src/abi/RegistrationSimple.json"
+);
 
 #[derive(Debug, Clone)]
 pub struct ContractsProviderConfig {
@@ -26,13 +42,6 @@ impl ContractsProvider {
         state_keeper::get_passport_info(&self.config, passport_key).await
     }
 }
-
-sol!(
-    #[sol(rpc)]
-    #[derive(Debug)]
-    StateKeeper,
-    "src/abi/StateKeeper.json"
-);
 
 #[derive(Debug, Error)]
 pub enum ContractsError {

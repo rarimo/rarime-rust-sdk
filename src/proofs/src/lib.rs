@@ -8,6 +8,7 @@ use thiserror::Error;
 
 mod utils;
 
+#[derive(Debug)]
 pub struct LiteProofInput {
     pub dg1: Vec<u8>,
     pub sk: String,

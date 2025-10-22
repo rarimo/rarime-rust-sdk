@@ -1,3 +1,24 @@
+pub use crate::document::DocumentStatus;
+use crate::document::get_document_status;
+use ::base64::engine::general_purpose::STANDARD;
+use ::base64::{DecodeError, Engine};
+use api::ApiProvider;
+use api::errors::ApiError;
+use api::types::relayer_light_register::{
+    LiteRegisterData, LiteRegisterRequest, LiteRegisterResponse,
+};
+use api::types::verify_sod::{Attributes, Data, DocumentSod, VerifySodRequest, VerifySodResponse};
+use contracts::RegistrationSimple::{Passport, registerSimpleViaNoirCall};
+use contracts::call_data_builder::CallDataBuilder;
+use contracts::utils::convert_to_u256;
+use contracts::{ContractsError, ContractsProviderConfig};
+pub use document::RarimePassport;
+use hex::FromHexError;
+use proofs::ProofError;
+use simple_asn1::to_der;
+use thiserror::Error;
+
+pub use utils::rarime_utils;
 pub mod masters_certificate_pool;
 pub mod passport;
 pub mod rfc;
@@ -12,7 +33,7 @@ mod utils;
 
 #[derive(Debug, Clone)]
 pub struct RarimeUserConfiguration {
-    pub user_private_key: Option<[u8; 32]>,
+    pub user_private_key: [u8; 32],
 }
 #[derive(Debug, Clone)]
 pub struct RarimeAPIConfiguration {
@@ -23,6 +44,7 @@ pub struct RarimeAPIConfiguration {
 #[derive(Debug, Clone)]
 pub struct RarimeContractsConfiguration {
     pub state_keeper_contract_address: String,
+    pub register_contract_address: String,
 }
 
 #[derive(Debug, Clone)]
@@ -54,16 +76,9 @@ impl Rarime {
                 .clone(),
         };
 
-        let private_key: [u8; 32] = match self.config.user_configuration.user_private_key.clone() {
-            Some(key) => key,
-            None => {
-                let new_key = RarimeUtils::generate_bjj_private_key()?;
-                self.config.user_configuration.user_private_key = Some(new_key);
-                new_key
-            }
-        };
-
-        let profile_key = get_profile_key(&private_key)?;
+        let profile_key = rarime_utils::get_profile_key(
+            &self.config.user_configuration.user_private_key.clone(),
+        )?;
 
         let passport_key = passport.get_passport_key()?;
 
@@ -72,20 +87,12 @@ impl Rarime {
         Ok(result)
     }
 
-    pub async fn light_registration(
+    pub async fn verify_sod(
         &mut self,
         passport: &RarimePassport,
+        proof: &[u8],
     ) -> Result<VerifySodResponse, RarimeError> {
-        let private_key: [u8; 32] = match self.config.user_configuration.user_private_key.clone() {
-            Some(key) => key,
-            None => {
-                let new_key = RarimeUtils::generate_bjj_private_key()?;
-                self.config.user_configuration.user_private_key = Some(new_key);
-                new_key
-            }
-        };
         let api_provider = ApiProvider::new(&self.config.api_configuration.rarime_api_url)?;
-
         let verify_sod_request = VerifySodRequest {
             data: Data {
                 id: "".to_string(),
@@ -119,14 +126,95 @@ impl Rarime {
                         },
                         sod: format!("0x{}", hex::encode(&passport.sod).to_uppercase()),
                     },
-                    zk_proof: STANDARD.encode(passport.prove_dg1(&private_key)?),
+                    zk_proof: STANDARD.encode(&proof),
                 },
             },
         };
 
         let verify_sod_response = api_provider.verify_sod(&verify_sod_request).await?;
-
         return Ok(verify_sod_response);
+    }
+
+    pub fn build_call_data(
+        &mut self,
+        verify_sod_response: &VerifySodResponse,
+        passport: &RarimePassport,
+        proof: &[u8],
+    ) -> Result<Vec<u8>, RarimeError> {
+        let public_key: [u8; 32] =
+            hex::decode(&verify_sod_response.data.attributes.public_key[2..])
+                .expect("Invalid hex string")[..32]
+                .try_into()
+                .expect("slice with incorrect length");
+
+        let call_data_builder = CallDataBuilder::new();
+        let inputs = registerSimpleViaNoirCall {
+            identityKey_: convert_to_u256(&RarimeUtils::get_profile_key(
+                &self.config.user_configuration.user_private_key,
+            )?)?,
+            passport_: Passport {
+                dgCommit: convert_to_u256(
+                    &proof[..32]
+                        .try_into()
+                        .expect("proof with incorrect length (length < 32)"),
+                )?,
+                dg1Hash: convert_to_u256(
+                    &proof[32..64]
+                        .try_into()
+                        .expect("proof with incorrect length (length < 64)"),
+                )?
+                .into(),
+                publicKey: public_key.into(),
+                passportHash: passport.get_passport_hash()?.into(),
+                verifier: hex::decode(
+                    verify_sod_response
+                        .data
+                        .attributes
+                        .verifier
+                        .chars()
+                        .skip(2)
+                        .collect::<String>(),
+                )?
+                .as_slice()
+                .try_into()
+                .expect("Expected a 20-byte slice as verifier address"),
+            },
+            signature_: hex::decode(&verify_sod_response.data.attributes.signature[2..])?.into(),
+            // Remove public signals from the proof
+            zkPoints_: proof[96..].to_vec().into(),
+        };
+
+        let call_data = call_data_builder.build_noir_lite_register_call_data(inputs)?;
+        return Ok(call_data);
+    }
+
+    pub async fn light_registration(
+        &mut self,
+        passport: &RarimePassport,
+    ) -> Result<LiteRegisterResponse, RarimeError> {
+        let proof = passport.prove_dg1(&self.config.user_configuration.user_private_key)?;
+        let verify_sod_response = self.verify_sod(&passport, &proof).await?;
+
+        let api_provider = ApiProvider::new(&self.config.api_configuration.rarime_api_url)?;
+
+        let call_data = self.build_call_data(&verify_sod_response, &passport, &proof)?;
+
+        let lite_register_request = LiteRegisterRequest {
+            data: LiteRegisterData {
+                tx_data: format!("0x{}", hex::encode(&call_data)),
+                no_send: false,
+                destination: self
+                    .config
+                    .contracts_configuration
+                    .register_contract_address
+                    .clone(),
+            },
+        };
+        let lite_register_response = api_provider
+            .relayer_light_register(&lite_register_request)
+            .await?;
+
+        return Ok(lite_register_response);
     }
 }
 
@@ -136,22 +224,11 @@ impl RarimeUtils {
     pub fn generate_bjj_private_key() -> Result<[u8; 32], RarimeError> {
         return rarime_utils::generate_bjj_private_key();
     }
-}
 
-pub use crate::document::DocumentStatus;
-use crate::document::get_document_status;
-use crate::utils::get_profile_key;
-use ::base64::engine::general_purpose::STANDARD;
-use ::base64::{DecodeError, Engine};
-use api::ApiProvider;
-use api::errors::ApiError;
-use api::types::verify_sod::{Attributes, Data, DocumentSod, VerifySodRequest, VerifySodResponse};
-use contracts::{ContractsError, ContractsProviderConfig};
-pub use document::RarimePassport;
-use proofs::ProofError;
-use simple_asn1::to_der;
-use thiserror::Error;
-pub use utils::rarime_utils;
+    pub fn get_profile_key(private_key: &[u8; 32]) -> Result<[u8; 32], RarimeError> {
+        return rarime_utils::get_profile_key(&private_key);
+    }
+}
 
 #[derive(Error, Debug)]
 pub enum RarimeError {
@@ -203,4 +280,6 @@ pub enum RarimeError {
     ProveError(#[from] ProofError),
     #[error("Api call error: {0}")]
     ApiError(#[from] ApiError),
+    #[error("Decode hex error: {0}")]
+    DecodeHexError(#[from] FromHexError),
 }
