@@ -1,0 +1,113 @@
+[Error]
+enum RarimeError {
+    "ASN1ParseError",
+    "ASN1WriteError",
+    "RSAError",
+    "UnsupportedSignatureAlgorithm",
+    "X509Error",
+    "PemError",
+    "NoCertificatesFound",
+    "UTF8Error",
+    "DecodeError",
+    "DerError",
+    "UnsupportedPassportKey",
+    "ParseDg15Error",
+    "GetPassportKeyError",
+    "GeneratePrivateKeyError",
+    "PoseidonHashError",
+    "ContractCallError",
+    "ASN1RouteError",
+    "EmptyDer",
+    "ASN1DecodeError",
+    "ASN1EncodeError",
+    "ContractError",
+    "OIDError",
+    "ProveError",
+    "ApiError",
+    "DecodeHexError",
+    "GetProfileKeyError",
+    "SetupSDKError",
+};
+
+enum DocumentStatus {
+    "NotRegistered",
+    "RegisteredWithThisPk",
+    "RegisteredWithOtherPk",
+};
+
+
+dictionary RarimePassport {
+    sequence<u8> data_group1;
+    sequence<u8>? data_group15;
+    sequence<u8>? aa_signature;
+    sequence<u8>? aa_challenge;
+    sequence<u8> sod;
+};
+
+
+dictionary RegisterResponseAttributes {
+    string tx_hash;
+};
+
+dictionary LiteRegisterResponseBody {
+    string id;
+    string type_field;
+    RegisterResponseAttributes attributes;
+};
+
+dictionary LiteRegisterResponse {
+    LiteRegisterResponseBody data;
+};
+
+
+dictionary RarimeUserConfiguration {
+    sequence<u8> user_private_key;
+};
+
+dictionary RarimeAPIConfiguration {
+    string json_rpc_evm_url;
+    string rarime_api_url;
+};
+
+dictionary RarimeContractsConfiguration {
+    string state_keeper_contract_address;
+    string register_contract_address;
+};
+
+dictionary RarimeConfiguration {
+    RarimeContractsConfiguration contracts_configuration;
+    RarimeAPIConfiguration api_configuration;
+    RarimeUserConfiguration user_configuration;
+};
+
+
+
+interface Rarime {
+    [Throws=RarimeError]
+    constructor(RarimeConfiguration config);
+    [Async,Throws=RarimeError]
+    DocumentStatus get_identity_status(RarimePassport passport);
+    [Async,Throws=RarimeError]
+    LiteRegisterResponse light_registration(RarimePassport passport);
+
+};
+
+
+
+interface RarimeUtils {
+constructor();
+    [Throws=RarimeError]
+    sequence<u8> generate_bjj_private_key();
+    [Throws=RarimeError]
+    sequence<u8> get_profile_key(sequence<u8> private_key);
+};
+
+
+namespace RarimeSDK {
+
+};
+
+
+
+
+

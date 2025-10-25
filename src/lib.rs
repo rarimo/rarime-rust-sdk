@@ -1,39 +1,42 @@
 pub use crate::document::DocumentStatus;
 use crate::document::get_document_status;
+pub use crate::errors::RarimeError;
+use crate::utils::vec_u8_to_u8_32;
+use ::base64::Engine;
 use ::base64::engine::general_purpose::STANDARD;
-use ::base64::{DecodeError, Engine};
 use api::ApiProvider;
-use api::errors::ApiError;
-use api::types::relayer_light_register::{
-    LiteRegisterData, LiteRegisterRequest, LiteRegisterResponse,
+pub use api::types::relayer_light_register::{
+    LiteRegisterData, LiteRegisterRequest, LiteRegisterResponse, LiteRegisterResponseBody,
+    RegisterResponseAttributes,
 };
 use api::types::verify_sod::{Attributes, Data, DocumentSod, VerifySodRequest, VerifySodResponse};
+use contracts::ContractsProviderConfig;
 use contracts::RegistrationSimple::{Passport, registerSimpleViaNoirCall};
 use contracts::call_data_builder::CallDataBuilder;
 use contracts::utils::convert_to_u256;
-use contracts::{ContractsError, ContractsProviderConfig};
 pub use document::RarimePassport;
-use hex::FromHexError;
-use proofs::ProofError;
 use simple_asn1::to_der;
-use thiserror::Error;
-
 pub use utils::rarime_utils;
+
 pub mod masters_certificate_pool;
 pub mod passport;
 pub mod rfc;
 
 mod base64;
 mod document;
+mod errors;
 mod hash_algorithm;
 mod owned_cert;
 mod signature_algorithm;
 mod treap_tree;
 mod utils;
 
+// UniFFI setup
+uniffi::include_scaffolding!("rarime_rust_sdk");
+
 #[derive(Debug, Clone)]
 pub struct RarimeUserConfiguration {
-    pub user_private_key: [u8; 32],
+    pub user_private_key: Vec<u8>,
 }
 #[derive(Debug, Clone)]
 pub struct RarimeAPIConfiguration {
@@ -59,13 +62,18 @@ pub struct Rarime {
 }
 
 impl Rarime {
-    pub fn new(config: RarimeConfiguration) -> Self {
-        Self { config }
+    pub fn new(config: RarimeConfiguration) -> Result<Self, RarimeError> {
+        if config.user_configuration.user_private_key.len() != 32 {
+            return Err(RarimeError::SetupSDKError(
+                "User private key length must be 32".to_string(),
+            ));
+        }
+        return Ok(Self { config });
     }
 
     pub async fn get_identity_status(
         &mut self,
-        passport: &RarimePassport,
+        passport: RarimePassport,
     ) -> Result<DocumentStatus, RarimeError> {
         let config = ContractsProviderConfig {
             rpc_url: self.config.api_configuration.json_rpc_evm_url.clone(),
@@ -76,9 +84,9 @@ impl Rarime {
                 .clone(),
         };
 
-        let profile_key = rarime_utils::get_profile_key(
-            &self.config.user_configuration.user_private_key.clone(),
-        )?;
+        let profile_key = rarime_utils::get_profile_key(&vec_u8_to_u8_32(
+            &self.config.user_configuration.user_private_key,
+        )?)?;
 
         let passport_key = passport.get_passport_key()?;
 
@@ -87,7 +95,7 @@ impl Rarime {
         Ok(result)
     }
 
-    pub async fn verify_sod(
+    pub(crate) async fn verify_sod(
         &mut self,
         passport: &RarimePassport,
         proof: &[u8],
@@ -135,7 +143,7 @@ impl Rarime {
         return Ok(verify_sod_response);
     }
 
-    pub fn build_call_data(
+    pub(crate) fn build_call_data(
         &mut self,
         verify_sod_response: &VerifySodResponse,
         passport: &RarimePassport,
@@ -149,8 +157,9 @@ impl Rarime {
 
         let call_data_builder = CallDataBuilder::new();
         let inputs = registerSimpleViaNoirCall {
-            identityKey_: convert_to_u256(&RarimeUtils::get_profile_key(
-                &self.config.user_configuration.user_private_key,
+            identityKey_: convert_to_u256(&vec_u8_to_u8_32(
+                &RarimeUtils
+                    .get_profile_key(self.config.user_configuration.user_private_key.clone())?,
             )?)?,
             passport_: Passport {
                 dgCommit: convert_to_u256(
@@ -190,9 +199,12 @@ impl Rarime {
 
     pub async fn light_registration(
         &mut self,
-        passport: &RarimePassport,
+        passport: RarimePassport,
     ) -> Result<LiteRegisterResponse, RarimeError> {
-        let proof = passport.prove_dg1(&self.config.user_configuration.user_private_key)?;
+        let private_key_validate =
+            vec_u8_to_u8_32(&self.config.user_configuration.user_private_key)?;
+
+        let proof = passport.prove_dg1(&private_key_validate)?;
         let verify_sod_response = self.verify_sod(&passport, &proof).await?;
 
         let api_provider = ApiProvider::new(&self.config.api_configuration.rarime_api_url)?;
@@ -218,68 +230,18 @@ impl Rarime {
     }
 }
 
-pub struct RarimeUtils {}
+pub struct RarimeUtils;
 
 impl RarimeUtils {
-    pub fn generate_bjj_private_key() -> Result<[u8; 32], RarimeError> {
-        return rarime_utils::generate_bjj_private_key();
+    pub fn new() -> Self {
+        RarimeUtils {}
+    }
+    pub fn generate_bjj_private_key(&self) -> Result<Vec<u8>, RarimeError> {
+        return Ok(rarime_utils::generate_bjj_private_key()?.to_vec());
     }
 
-    pub fn get_profile_key(private_key: &[u8; 32]) -> Result<[u8; 32], RarimeError> {
-        return rarime_utils::get_profile_key(&private_key);
+    pub fn get_profile_key(&self, private_key: Vec<u8>) -> Result<Vec<u8>, RarimeError> {
+        let private_key_validate = vec_u8_to_u8_32(&private_key)?;
+        return Ok(rarime_utils::get_profile_key(&private_key_validate)?.to_vec());
     }
-}
-
-#[derive(Error, Debug)]
-pub enum RarimeError {
-    #[error("failed to parse asn1 data")]
-    ASN1ParseError(#[from] asn1::ParseError),
-    #[error("failed to write asn1 data")]
-    ASN1WriteError(#[from] asn1::WriteError),
-    #[error("failed to perform RSA operation")]
-    RSAError(#[from] rsa::errors::Error),
-    #[error("unsupported signature algorithm")]
-    UnsupportedSignatureAlgorithm,
-    #[error("X509 error: {0}")]
-    X509Error(String),
-    #[error("PEM error: {0}")]
-    PemError(String),
-    #[error("No certificates found")]
-    NoCertificatesFound,
-    #[error("UTF-8 error: {0}")]
-    UTF8Error(#[from] std::str::Utf8Error),
-    #[error("Decoding error: {0}")]
-    DecodeError(#[from] DecodeError),
-    #[error("Der error: {0}")]
-    DerError(String),
-    #[error("Unsupported type of public key")]
-    UnsupportedPassportKey,
-    #[error("Parsing DG15 error: {0}")]
-    ParseDg15Error(String),
-    #[error("Get passport key error: {0}")]
-    GetPassportKeyError(String),
-    #[error("Generate private key error")]
-    GeneratePrivateKeyError,
-    #[error("Poseidon error: {0}")]
-    PoseidonHashError(String),
-    #[error("Contract error: {0}")]
-    ContractCallError(#[from] ContractsError),
-    #[error("ASN1 routing error: {0}")]
-    ASN1RouteError(String),
-    #[error("Empty DER data: expected at least one block")]
-    EmptyDer,
-    #[error("Decoding ASN1 error: {0}")]
-    ASN1DecodeError(#[from] simple_asn1::ASN1DecodeErr),
-    #[error("Encoding ASN1 error: {0}")]
-    ASN1EncodeError(#[from] simple_asn1::ASN1EncodeErr),
-    #[error(transparent)]
-    ContractError(ContractsError),
-    #[error("OID operation error: {0}")]
-    OIDError(const_oid::Error),
-    #[error("Generate proof error: {0}")]
-    ProveError(#[from] ProofError),
-    #[error("Api call error: {0}")]
-    ApiError(#[from] ApiError),
-    #[error("Decode hex error: {0}")]
-    DecodeHexError(#[from] FromHexError),
 }
