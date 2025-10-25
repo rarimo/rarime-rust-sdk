@@ -148,3 +148,12 @@ pub fn convert_asn1_to_pem(asn1_block: &ASN1Block) -> Result<String, RarimeError
 
     Ok(pem_string)
 }
+
+pub fn vec_u8_to_u8_32(vec: &Vec<u8>) -> Result<[u8; 32], RarimeError> {
+    let result: [u8; 32] = vec.as_slice().try_into().map_err(|_| {
+        crate::errors::RarimeError::GetProfileKeyError(
+            "Private key must be 32 bytes in length.".to_string(),
+        )
+    })?;
+    return Ok(result);
+}
