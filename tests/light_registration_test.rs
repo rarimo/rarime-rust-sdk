@@ -25,11 +25,11 @@ mod tests {
                 rarime_api_url: "https://api.orgs.app.stage.rarime.com".to_string(),
             },
             user_configuration: RarimeUserConfiguration {
-                user_private_key: RarimeUtils::generate_bjj_private_key().unwrap(),
+                user_private_key: RarimeUtils.generate_bjj_private_key().unwrap(),
             },
         };
 
-        let mut rarime = Rarime::new(rarime_config.clone());
+        let mut rarime = Rarime::new(rarime_config).unwrap();
 
         let passport = RarimePassport {
             data_group1: STANDARD
