@@ -3,6 +3,12 @@ name = "rarime-rust-sdk"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "rarime_rust_sdk"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib", "staticlib"]
+
+
 [dependencies]
 asn1 = { git = "https://github.com/rarimo/rust-asn1", rev = "19db8629e2c1591b98a204740c0438031281db69" }
 base64 = "0.22.1"
@@ -39,7 +45,10 @@ tokio = { version = "1.47.1", features = ["full"] }
 futures = "0.3.31"
 reqwest = "0.12.24"
 url = "2.5.7"
-
+uniffi = { version = "0.30.0", features = ["cli", "bindgen"] }
 
 [patch.crates-io]
 proptest = { git = "https://github.com/proptest-rs/proptest", tag = "v1.6.0" }
+
+[build-dependencies]
+uniffi_build = "0.30.0"
