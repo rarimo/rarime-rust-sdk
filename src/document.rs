@@ -5,7 +5,7 @@ use crate::utils::{convert_asn1_to_pem, extract_oid_from_asn1, poseidon_hash_32_
 use contracts::{ContractsProvider, ContractsProviderConfig};
 use num_bigint::BigInt;
 use num_traits::{One, Zero};
-use proofs::{LiteProofInput, ProofProvider};
+use proofs::{LiteRegisterProofInput, ProofProvider};
 use simple_asn1::{ASN1Block, ASN1Class, BigUint, from_der, to_der};
 
 enum ActiveAuthKey {
@@ -861,13 +861,14 @@ impl RarimePassport {
 
         let parsed_oid = extract_oid_from_asn1(&dg_algo_block)?;
         let parsed_hash_algorithm = HashAlgorithm::from_oid(parsed_oid)?;
-        let proof_inputs = LiteProofInput {
+        let proof_inputs = LiteRegisterProofInput {
             dg1: self.data_group1.clone(),
             sk: BigUint::from_bytes_be(private_key).to_str_radix(10),
         };
 
-        let proof_provider = ProofProvider::new(parsed_hash_algorithm.get_byte_length());
-        let register_proof = proof_provider.generate_lite_proof(proof_inputs)?;
+        let proof_provider = ProofProvider::new();
+        let register_proof = proof_provider
+            .generate_lite_proof(parsed_hash_algorithm.get_byte_length(), proof_inputs)?;
 
         return Ok(register_proof);
     }
