@@ -34,7 +34,7 @@ The SDK is completely **free**, **open-source**, and **community-driven**.
 At the heart of the SDK is a **core Rust library** that implements all logic required for interacting with the Rarimo
 protocol.
 
-Using **UniFFI**, we define the SDK’s interface in a `.udl` file (`src/rarime.udl`) and automatically generate FFI
+Using **UniFFI**, we define the SDK’s interface in a `.udl` file (`./rarime_rust_sdk.udl`) and automatically generate FFI
 bindings for supported platforms.
 
 This architecture allows us to:
