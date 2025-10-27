@@ -25,11 +25,11 @@ mod tests {
                 rarime_api_url: "https://api.orgs.app.stage.rarime.com".to_string(),
             },
             user_configuration: RarimeUserConfiguration {
-                user_private_key: RarimeUtils::generate_bjj_private_key().unwrap(),
+                user_private_key: RarimeUtils.generate_bjj_private_key().unwrap(),
             },
         };
 
-        let mut rarime = Rarime::new(rarime_config.clone());
+        let rarime = Rarime::new(rarime_config.clone()).unwrap();
 
         let passport = RarimePassport {
             data_group1: STANDARD
@@ -49,7 +49,13 @@ mod tests {
 
         let proof = tokio::task::spawn_blocking({
             let passport = passport.clone();
-            let user_key = rarime_config.user_configuration.user_private_key.clone();
+            let user_key: [u8; 32] = rarime_config
+                .user_configuration
+                .user_private_key
+                .clone()
+                .as_slice()
+                .try_into()
+                .unwrap();
             move || passport.prove_dg1(&user_key).unwrap()
         })
         .await

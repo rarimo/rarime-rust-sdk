@@ -68,17 +68,99 @@ cd rarime-rust-sdk
 # Build the Rust library
 cargo build --release
 
+# Install UniFFI for generating bindings
+cargo install uniffi --features cli
+
 # Generate FFI bindings (example)
-cargo run --bin uniffi-bindgen generate src/rarime.udl --language <target_language> --out-dir <output_dir>
+uniffi-bindgen generate ./rarime_rust_sdk.udl --language <target_language> --out-dir <output_dir>
 ```
 
 > 🧠 The SDK’s core is fully portable — you can integrate it with any language or platform supported by UniFFI.
+> 🔗 For more detailed information about the supported languages and the binding generation process, please visit
+> the [UniFFI project page](https://github.com/mozilla/uniffi-rs).
+
+---
+
+# Configuration for integration
+
+We support two chains:
+
+- **MainNet** — for releases and production use
+- **TestNet** — for development and testing
+
+> **Note:** You can also use your own addresses and resources.
+
+---
+
+## API Addresses
+
+| Name           | MainNet Address              | TestNet Address                         |
+|----------------|------------------------------|-----------------------------------------|
+| `JSON_RPC_URL` | `https://l2.rarimo.com`      | `https://rpc.evm.mainnet.rarimo.com`    |
+| `API_URL`      | `https://api.app.rarime.com` | `https://api.orgs.app.stage.rarime.com` |
+
+---
+
+## Contract Addresses
+
+| Name                            | MainNet Address                              | TestNet Address                              |
+|---------------------------------|----------------------------------------------|----------------------------------------------|
+| `STATE_KEEPER_CONTRACT_ADDRESS` | `0x61aa5b68D811884dA4FEC2De4a7AA0464df166E1` | `0x9EDADB216C1971cf0343b8C687cF76E7102584DB` |
+| `REGISTER_CONTRACT_ADDRESS`     | `0x497D6957729d3a39D43843BD27E6cbD12310F273` | `0xd63782478CA40b587785700Ce49248775398b045` |
 
 ---
 
 ## 🚀 Example Usage
 
-```rust
+```Kotlin
+    ///Setup utils
+    val utils = RarimeUtils()
+
+    ///Setup Config
+    val userPrivateKey = utils.generateBjjPrivateKey()
+    val userConfiguration = RarimeUserConfiguration(
+        userPrivateKey = userPrivateKey
+    )
+
+    val apiConfiguration = RarimeApiConfiguration(
+        jsonRpcEvmUrl = "<JSON_RPC_URL>",
+        rarimeApiUrl = "<API_URL>"
+    )
+
+    val confContract = RarimeContractsConfiguration(
+        stateKeeperContractAddress = "<STATE_KEEPER_CONTRACT_ADDRESS>",
+         registerContractAddress = "<REGISTER_CONTRACT_ADDRESS>"
+    )
+
+    val rarimeConfiguration = RarimeConfiguration(
+        contractsConfiguration = confContract,
+        apiConfiguration = apiConfiguration,
+        userConfiguration = userConfiguration
+    )
+
+    ///Setup SDK
+    val rarime = Rarime(config = rarimeConfiguration)
+
+    /// Setup passport
+    /// This is an example. Replace with your own data.
+    val passport = RarimePassport(
+        dataGroup1 = emptyList(),
+        dataGroup15 = null,
+        aaSignature = null,
+        aaChallenge = null,
+        sod = emptyList()
+    )
+
+    ///Check passport status
+    ///Status may be :
+    ///    NOT_REGISTERED, // not register document
+    ///    REGISTERED_WITH_THIS_PK, // document was register with this user private key
+    ///    REGISTERED_WITH_OTHER_PK; // document was register with another user private key
+    val documentStatus = runBlocking { rarime.getDocumentStatus(passport) }
+
+    ///Light registration
+    ///Returned hash of register transaction from blockchain
+    val tx_hash = runBlocking { rarime.lightRegistration(passport) }
 
 ```
 

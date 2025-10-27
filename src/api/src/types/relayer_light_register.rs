@@ -8,7 +8,7 @@ pub struct RegisterResponseBody {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LiteRegisterResponse {
-    data: LiteRegisterResponseBody,
+    pub data: LiteRegisterResponseBody,
 }
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LiteRegisterResponseBody {

@@ -24,14 +24,12 @@ mod tests {
                 rarime_api_url: "https://api.orgs.app.stage.rarime.com".to_string(),
             },
             user_configuration: RarimeUserConfiguration {
-                user_private_key: <[u8; 32]>::try_from(
-                    hex::decode(json_value.get("pk").unwrap().as_str().unwrap()).unwrap(),
-                )
-                .unwrap(),
+                user_private_key: hex::decode(json_value.get("pk").unwrap().as_str().unwrap())
+                    .unwrap(),
             },
         };
 
-        let mut rarime = Rarime::new(rarime_config);
+        let rarime = Rarime::new(rarime_config).unwrap();
 
         let passport = RarimePassport {
             data_group1: STANDARD
@@ -49,7 +47,7 @@ mod tests {
                 .unwrap(),
         };
 
-        let result = rarime.get_identity_status(&passport).await.unwrap();
+        let result = rarime.get_document_status(passport).await.unwrap();
 
         dbg!(result);
     }
@@ -69,14 +67,12 @@ mod tests {
                 rarime_api_url: "https://api.orgs.app.stage.rarime.com".to_string(),
             },
             user_configuration: RarimeUserConfiguration {
-                user_private_key: <[u8; 32]>::try_from(
-                    hex::decode(json_value.get("pk").unwrap().as_str().unwrap()).unwrap(),
-                )
-                .unwrap(),
+                user_private_key: hex::decode(json_value.get("pk").unwrap().as_str().unwrap())
+                    .unwrap(),
             },
         };
 
-        let mut rarime = Rarime::new(rarime_config);
+        let rarime = Rarime::new(rarime_config).unwrap();
 
         let passport = RarimePassport {
             data_group1: STANDARD
@@ -94,7 +90,7 @@ mod tests {
                 .unwrap(),
         };
 
-        let result = rarime.get_identity_status(&passport).await.unwrap();
+        let result = rarime.get_document_status(passport).await.unwrap();
 
         dbg!(result);
     }
@@ -114,14 +110,12 @@ mod tests {
                 rarime_api_url: "https://api.orgs.app.stage.rarime.com".to_string(),
             },
             user_configuration: RarimeUserConfiguration {
-                user_private_key: <[u8; 32]>::try_from(
-                    hex::decode(json_value.get("pk").unwrap().as_str().unwrap()).unwrap(),
-                )
-                .unwrap(),
+                user_private_key: hex::decode(json_value.get("pk").unwrap().as_str().unwrap())
+                    .unwrap(),
             },
         };
 
-        let mut rarime = Rarime::new(rarime_config);
+        let rarime = Rarime::new(rarime_config).unwrap();
 
         let passport = RarimePassport {
             data_group1: STANDARD
@@ -135,7 +129,7 @@ mod tests {
                 .unwrap(),
         };
 
-        let result = rarime.get_identity_status(&passport).await.unwrap();
+        let result = rarime.get_document_status(passport).await.unwrap();
         dbg!(result);
     }
 }
