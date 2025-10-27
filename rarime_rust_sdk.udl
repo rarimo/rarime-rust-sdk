@@ -71,7 +71,7 @@ interface Rarime {
     [Throws=RarimeError]
     constructor(RarimeConfiguration config);
     [Async,Throws=RarimeError]
-    DocumentStatus get_identity_status(RarimePassport passport);
+    DocumentStatus get_document_status(RarimePassport passport);
     [Async,Throws=RarimeError]
     string light_registration(RarimePassport passport);
 
