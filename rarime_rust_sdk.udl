@@ -45,21 +45,6 @@ dictionary RarimePassport {
 };
 
 
-dictionary RegisterResponseAttributes {
-    string tx_hash;
-};
-
-dictionary LiteRegisterResponseBody {
-    string id;
-    string type_field;
-    RegisterResponseAttributes attributes;
-};
-
-dictionary LiteRegisterResponse {
-    LiteRegisterResponseBody data;
-};
-
-
 dictionary RarimeUserConfiguration {
     sequence<u8> user_private_key;
 };
@@ -88,7 +73,7 @@ interface Rarime {
     [Async,Throws=RarimeError]
     DocumentStatus get_identity_status(RarimePassport passport);
     [Async,Throws=RarimeError]
-    LiteRegisterResponse light_registration(RarimePassport passport);
+    string light_registration(RarimePassport passport);
 
 };
 
