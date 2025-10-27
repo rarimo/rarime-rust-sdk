@@ -94,10 +94,10 @@ We support two chains:
 
 ## API Addresses
 
-| Name           | MainNet Address                         | TestNet Address                         |
-|----------------|-----------------------------------------|-----------------------------------------|
-| `JSON_RPC_URL` | `https://l2.rarimo.com`                 | `https://rpc.evm.mainnet.rarimo.com`    |
-| `API_URL`      | `https://api.orgs.app.stage.rarime.com` | `https://api.orgs.app.stage.rarime.com` |
+| Name           | MainNet Address              | TestNet Address                         |
+|----------------|------------------------------|-----------------------------------------|
+| `JSON_RPC_URL` | `https://l2.rarimo.com`      | `https://rpc.evm.mainnet.rarimo.com`    |
+| `API_URL`      | `https://api.app.rarime.com` | `https://api.orgs.app.stage.rarime.com` |
 
 ---
 
