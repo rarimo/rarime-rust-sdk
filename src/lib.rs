@@ -71,7 +71,7 @@ impl Rarime {
         return Ok(Self { config });
     }
 
-    pub async fn get_identity_status(
+    pub async fn get_document_status(
         &self,
         passport: RarimePassport,
     ) -> Result<DocumentStatus, RarimeError> {
