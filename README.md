@@ -94,23 +94,19 @@ We support two chains:
 
 ## API Addresses
 
-| Name           | Chain   | URL Address                             |
-|----------------|---------|-----------------------------------------|
-| `JSON_RPC_URL` | MainNet | `https://l2.rarimo.com`                 |
-| `JSON_RPC_URL` | TestNet | `https://rpc.evm.mainnet.rarimo.com`    |
-| `API_URL`      | MainNet | `https://api.orgs.app.stage.rarime.com` |
-| `API_URL`      | TestNet | `https://api.orgs.app.stage.rarime.com` |
+| Name           | MainNet Address                         | TestNet Address                         |
+|----------------|-----------------------------------------|-----------------------------------------|
+| `JSON_RPC_URL` | `https://l2.rarimo.com`                 | `https://rpc.evm.mainnet.rarimo.com`    |
+| `API_URL`      | `https://api.orgs.app.stage.rarime.com` | `https://api.orgs.app.stage.rarime.com` |
 
 ---
 
 ## Contract Addresses
 
-| Name                            | Chain   | EVM Address (example)                        |
-|---------------------------------|---------|----------------------------------------------|
-| `STATE_KEEPER_CONTRACT_ADDRESS` | MainNet | `0x61aa5b68D811884dA4FEC2De4a7AA0464df166E1` |
-| `STATE_KEEPER_CONTRACT_ADDRESS` | TestNet | `0x9EDADB216C1971cf0343b8C687cF76E7102584DB` |
-| `REGISTER_CONTRACT_ADDRESS`     | MainNet | `0x497D6957729d3a39D43843BD27E6cbD12310F273` |
-| `REGISTER_CONTRACT_ADDRESS`     | TestNet | `0xd63782478CA40b587785700Ce49248775398b045` |
+| Name                            | MainNet Address                              | TestNet Address                              |
+|---------------------------------|----------------------------------------------|----------------------------------------------|
+| `STATE_KEEPER_CONTRACT_ADDRESS` | `0x61aa5b68D811884dA4FEC2De4a7AA0464df166E1` | `0x9EDADB216C1971cf0343b8C687cF76E7102584DB` |
+| `REGISTER_CONTRACT_ADDRESS`     | `0x497D6957729d3a39D43843BD27E6cbD12310F273` | `0xd63782478CA40b587785700Ce49248775398b045` |
 
 ---
 
