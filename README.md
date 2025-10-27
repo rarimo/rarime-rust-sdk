@@ -76,7 +76,41 @@ uniffi-bindgen generate ./rarime_rust_sdk.udl --language <target_language> --out
 ```
 
 > 🧠 The SDK’s core is fully portable — you can integrate it with any language or platform supported by UniFFI.
-> 🔗 For more detailed information about the supported languages and the binding generation process, please visit the [UniFFI project page](https://github.com/mozilla/uniffi-rs).
+> 🔗 For more detailed information about the supported languages and the binding generation process, please visit
+> the [UniFFI project page](https://github.com/mozilla/uniffi-rs).
+
+---
+
+# Configuration for integration
+
+We support two chains:
+
+- **MainNet** — for releases and production use
+- **TestNet** — for development and testing
+
+> **Note:** You can also use your own addresses and resources.
+
+---
+
+## API Addresses
+
+| Name           | Chain   | URL Address                             |
+|----------------|---------|-----------------------------------------|
+| `JSON_RPC_URL` | MainNet | `https://l2.rarimo.com`                 |
+| `JSON_RPC_URL` | TestNet | `https://rpc.evm.mainnet.rarimo.com`    |
+| `API_URL`      | MainNet | `https://api.orgs.app.stage.rarime.com` |
+| `API_URL`      | TestNet | `https://api.orgs.app.stage.rarime.com` |
+
+---
+
+## Contract Addresses
+
+| Name                            | Chain   | EVM Address (example)                        |
+|---------------------------------|---------|----------------------------------------------|
+| `STATE_KEEPER_CONTRACT_ADDRESS` | MainNet | `0x61aa5b68D811884dA4FEC2De4a7AA0464df166E1` |
+| `STATE_KEEPER_CONTRACT_ADDRESS` | TestNet | `0x9EDADB216C1971cf0343b8C687cF76E7102584DB` |
+| `REGISTER_CONTRACT_ADDRESS`     | MainNet | `0x497D6957729d3a39D43843BD27E6cbD12310F273` |
+| `REGISTER_CONTRACT_ADDRESS`     | TestNet | `0xd63782478CA40b587785700Ce49248775398b045` |
 
 ---
 
@@ -93,13 +127,13 @@ uniffi-bindgen generate ./rarime_rust_sdk.udl --language <target_language> --out
     )
 
     val apiConfiguration = RarimeApiConfiguration(
-        jsonRpcEvmUrl = "<YOUR_JSON_RPC_URL>",
-        rarimeApiUrl = "<YOUR_API_URL>"
+        jsonRpcEvmUrl = "<JSON_RPC_URL>",
+        rarimeApiUrl = "<API_URL>"
     )
 
     val confContract = RarimeContractsConfiguration(
-        stateKeeperContractAddress = "<YOUR_STATE_KEEPER_CONTRACT_ADDRESS>",
-         registerContractAddress = "<YOUR_REGISTER_CONTRACT_ADDRESS>"
+        stateKeeperContractAddress = "<STATE_KEEPER_CONTRACT_ADDRESS>",
+         registerContractAddress = "<REGISTER_CONTRACT_ADDRESS>"
     )
 
     val rarimeConfiguration = RarimeConfiguration(
@@ -111,7 +145,8 @@ uniffi-bindgen generate ./rarime_rust_sdk.udl --language <target_language> --out
     ///Setup SDK
     val rarime = Rarime(config = rarimeConfiguration)
 
-    ///Setup passport
+    /// Setup passport
+    /// This is an example. Replace with your own data.
     val passport = RarimePassport(
         dataGroup1 = emptyList(),
         dataGroup15 = null,
