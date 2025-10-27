@@ -47,7 +47,7 @@ mod tests {
                 .unwrap(),
         };
 
-        let result = rarime.get_identity_status(passport).await.unwrap();
+        let result = rarime.get_document_status(passport).await.unwrap();
 
         dbg!(result);
     }
@@ -90,7 +90,7 @@ mod tests {
                 .unwrap(),
         };
 
-        let result = rarime.get_identity_status(passport).await.unwrap();
+        let result = rarime.get_document_status(passport).await.unwrap();
 
         dbg!(result);
     }
@@ -129,7 +129,7 @@ mod tests {
                 .unwrap(),
         };
 
-        let result = rarime.get_identity_status(passport).await.unwrap();
+        let result = rarime.get_document_status(passport).await.unwrap();
         dbg!(result);
     }
 }
