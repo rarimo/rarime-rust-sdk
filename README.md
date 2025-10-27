@@ -67,6 +67,12 @@ cd rarime-rust-sdk
 
 # Build the Rust library
 cargo build --release
+
+# Install UniFFI for generating bindings
+cargo install uniffi --features cli
+
+# Generate FFI bindings (example)
+uniffi-bindgen generate ./rarime_rust_sdk.udl --language <target_language> --out-dir <output_dir>
 ```
 
 > 🧠 The SDK’s core is fully portable — you can integrate it with any language or platform supported by UniFFI.
@@ -75,13 +81,55 @@ cargo build --release
 
 ## 🚀 Example Usage
 
+```Kotlin
+    ///Setup utils
+    val utils = RarimeUtils()
 
-```bash
-# Install UniFFI for generating bindings
-cargo install uniffi --features cli
+    ///Setup Config
+    val userPrivateKey = utils.generateBjjPrivateKey()
+    val userConfiguration = RarimeUserConfiguration(
+        userPrivateKey = userPrivateKey
+    )
 
-# Generate FFI bindings (example)
-uniffi-bindgen generate ./rarime_rust_sdk.udl --language <target_language> --out-dir <output_dir>
+    val apiConfiguration = RarimeApiConfiguration(
+        jsonRpcEvmUrl = "<YOUR_JSON_RPC_URL>",
+        rarimeApiUrl = "<YOUR_API_URL>"
+    )
+
+    val confContract = RarimeContractsConfiguration(
+        stateKeeperContractAddress = "<YOUR_STATE_KEEPER_CONTRACT_ADDRESS>",
+         registerContractAddress = "<YOUR_REGISTER_CONTRACT_ADDRESS>"
+    )
+
+    val rarimeConfiguration = RarimeConfiguration(
+        contractsConfiguration = confContract,
+        apiConfiguration = apiConfiguration,
+        userConfiguration = userConfiguration
+    )
+
+    ///Setup SDK
+    val rarime = Rarime(config = rarimeConfiguration)
+
+    ///Setup passport
+    val passport = RarimePassport(
+        dataGroup1 = emptyList(),
+        dataGroup15 = null,
+        aaSignature = null,
+        aaChallenge = null,
+        sod = emptyList()
+    )
+
+    ///Check passport status
+    ///Status may be :
+    ///    NOT_REGISTERED, // not register document
+    ///    REGISTERED_WITH_THIS_PK, // document was register with this user private key
+    ///    REGISTERED_WITH_OTHER_PK; // document was register with another user private key
+    val documentStatus = runBlocking { rarime.getDocumentStatus(passport) }
+
+    ///Light registration
+    ///Returned hash of register transaction from blockchain
+    val tx_hash = runBlocking { rarime.lightRegistration(passport) }
+
 ```
 
 ---
