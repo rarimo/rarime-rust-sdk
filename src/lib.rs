@@ -72,7 +72,7 @@ impl Rarime {
     }
 
     pub async fn get_identity_status(
-        &mut self,
+        &self,
         passport: RarimePassport,
     ) -> Result<DocumentStatus, RarimeError> {
         let config = ContractsProviderConfig {
@@ -95,8 +95,8 @@ impl Rarime {
         Ok(result)
     }
 
-    pub(crate) async fn verify_sod(
-        &mut self,
+    pub async fn verify_sod(
+        &self,
         passport: &RarimePassport,
         proof: &[u8],
     ) -> Result<VerifySodResponse, RarimeError> {
@@ -144,7 +144,7 @@ impl Rarime {
     }
 
     pub(crate) fn build_call_data(
-        &mut self,
+        &self,
         verify_sod_response: &VerifySodResponse,
         passport: &RarimePassport,
         proof: &[u8],
@@ -198,9 +198,9 @@ impl Rarime {
     }
 
     pub async fn light_registration(
-        &mut self,
+        &self,
         passport: RarimePassport,
-    ) -> Result<LiteRegisterResponse, RarimeError> {
+    ) -> Result<String, RarimeError> {
         let private_key_validate =
             vec_u8_to_u8_32(&self.config.user_configuration.user_private_key)?;
 
@@ -226,7 +226,9 @@ impl Rarime {
             .relayer_light_register(&lite_register_request)
             .await?;
 
-        return Ok(lite_register_response);
+        let tx_hash = lite_register_response.data.attributes.tx_hash;
+
+        return Ok(tx_hash);
     }
 }
 
