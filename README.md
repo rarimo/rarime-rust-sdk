@@ -67,9 +67,6 @@ cd rarime-rust-sdk
 
 # Build the Rust library
 cargo build --release
-
-# Generate FFI bindings (example)
-cargo run --bin uniffi-bindgen generate src/rarime.udl --language <target_language> --out-dir <output_dir>
 ```
 
 > 🧠 The SDK’s core is fully portable — you can integrate it with any language or platform supported by UniFFI.
@@ -78,8 +75,13 @@ cargo run --bin uniffi-bindgen generate src/rarime.udl --language <target_langua
 
 ## 🚀 Example Usage
 
-```rust
 
+```bash
+# Install UniFFI for generating bindings
+cargo install uniffi --features cli
+
+# Generate FFI bindings (example)
+uniffi-bindgen generate ./rarime_rust_sdk.udl --language <target_language> --out-dir <output_dir>
 ```
 
 ---
