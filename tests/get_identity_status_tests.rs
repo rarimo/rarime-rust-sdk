@@ -29,7 +29,7 @@ mod tests {
             },
         };
 
-        let mut rarime = Rarime::new(rarime_config).unwrap();
+        let rarime = Rarime::new(rarime_config).unwrap();
 
         let passport = RarimePassport {
             data_group1: STANDARD
@@ -72,7 +72,7 @@ mod tests {
             },
         };
 
-        let mut rarime = Rarime::new(rarime_config).unwrap();
+        let rarime = Rarime::new(rarime_config).unwrap();
 
         let passport = RarimePassport {
             data_group1: STANDARD
@@ -115,7 +115,7 @@ mod tests {
             },
         };
 
-        let mut rarime = Rarime::new(rarime_config).unwrap();
+        let rarime = Rarime::new(rarime_config).unwrap();
 
         let passport = RarimePassport {
             data_group1: STANDARD

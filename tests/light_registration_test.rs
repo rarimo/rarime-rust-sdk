@@ -29,7 +29,7 @@ mod tests {
             },
         };
 
-        let mut rarime = Rarime::new(rarime_config).unwrap();
+        let rarime = Rarime::new(rarime_config).unwrap();
 
         let passport = RarimePassport {
             data_group1: STANDARD
@@ -47,7 +47,7 @@ mod tests {
                 .unwrap(),
         };
         let result = tokio::task::spawn_blocking(move || {
-            futures::executor::block_on(rarime.light_registration(&passport))
+            futures::executor::block_on(rarime.light_registration(passport))
         })
         .await
         .unwrap()

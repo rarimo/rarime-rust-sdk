@@ -29,7 +29,7 @@ mod tests {
             },
         };
 
-        let mut rarime = Rarime::new(rarime_config.clone()).unwrap();
+        let rarime = Rarime::new(rarime_config.clone()).unwrap();
 
         let passport = RarimePassport {
             data_group1: STANDARD
