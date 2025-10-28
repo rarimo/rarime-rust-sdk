@@ -19,6 +19,7 @@ mod tests {
                 state_keeper_contract_address: "0x9EDADB216C1971cf0343b8C687cF76E7102584DB"
                     .to_string(),
                 register_contract_address: "0xd63782478CA40b587785700Ce49248775398b045".to_string(),
+                poseidon_smt_address: "".to_string(),
             },
             api_configuration: RarimeAPIConfiguration {
                 json_rpc_evm_url: "https://rpc.evm.mainnet.rarimo.com".to_string(),
