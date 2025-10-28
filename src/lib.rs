@@ -31,8 +31,8 @@ mod signature_algorithm;
 mod treap_tree;
 mod utils;
 
-// // UniFFI setup
-// uniffi::include_scaffolding!("rarime_rust_sdk");
+// UniFFI setup
+uniffi::include_scaffolding!("rarime_rust_sdk");
 
 #[derive(Debug, Clone)]
 pub struct QueryProofParams {

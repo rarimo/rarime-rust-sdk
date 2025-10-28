@@ -35,6 +35,21 @@ enum DocumentStatus {
     "RegisteredWithOtherPk",
 };
 
+dictionary QueryProofParams {
+    string event_id;
+    string event_data;
+    string selector;
+    string timestamp_lowerbound;
+    string timestamp_upperbound;
+    string identity_count_lowerbound;
+    string identity_count_upperbound;
+    string birth_date_lowerbound;
+    string birth_date_upperbound;
+    string expiration_date_lowerbound;
+    string expiration_date_upperbound;
+    string citizenship_mask;
+};
+
 
 dictionary RarimePassport {
     sequence<u8> data_group1;
@@ -57,6 +72,7 @@ dictionary RarimeAPIConfiguration {
 dictionary RarimeContractsConfiguration {
     string state_keeper_contract_address;
     string register_contract_address;
+    string poseidon_smt_address;
 };
 
 dictionary RarimeConfiguration {
@@ -74,6 +90,8 @@ interface Rarime {
     DocumentStatus get_document_status(RarimePassport passport);
     [Async,Throws=RarimeError]
     string light_registration(RarimePassport passport);
+    [Async,Throws=RarimeError]
+    sequence<u8> generate_query_proof(RarimePassport passport, QueryProofParams query_params);
 
 };
 
