@@ -1,7 +1,9 @@
 pub mod call_data_builder;
+mod poseidon_smt;
 mod state_keeper;
 pub mod utils;
 
+use crate::SparseMerkleTree::Proof;
 use alloy::hex::FromHexError;
 use alloy::sol;
 use thiserror::Error;
@@ -20,10 +22,18 @@ sol!(
     "src/abi/RegistrationSimple.json"
 );
 
+sol!(
+    #[sol(rpc)]
+    #[derive(Debug)]
+    PoseidonSMT,
+    "src/abi/PoseidonSMT.json"
+);
+
 #[derive(Debug, Clone)]
 pub struct ContractsProviderConfig {
     pub rpc_url: String,
     pub state_keeper_contract_address: String,
+    pub poseidon_smt_address: String,
 }
 
 pub struct ContractsProvider {
@@ -40,6 +50,10 @@ impl ContractsProvider {
         passport_key: &[u8; 32],
     ) -> Result<StateKeeper::getPassportInfoReturn, ContractsError> {
         state_keeper::get_passport_info(&self.config, passport_key).await
+    }
+
+    pub async fn get_smt_proof(&self, key: &[u8; 32]) -> Result<Proof, ContractsError> {
+        poseidon_smt::get_proof_call(&self.config, key).await
     }
 }
 
