@@ -1,12 +1,13 @@
-use crate::RarimeError;
 use crate::hash_algorithm::HashAlgorithm;
 use crate::signature_algorithm::SignatureAlgorithm;
 use crate::utils::{convert_asn1_to_pem, extract_oid_from_asn1, poseidon_hash_32_bytes};
+use crate::{QueryProofParams, RarimeError};
 use contracts::{ContractsProvider, ContractsProviderConfig};
 use num_bigint::BigInt;
 use num_traits::{One, Zero};
-use proofs::{LiteRegisterProofInput, ProofProvider};
+use proofs::{LiteRegisterProofInput, ProofProvider, QueryProofInput};
 use simple_asn1::{ASN1Block, ASN1Class, BigUint, from_der, to_der};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 enum ActiveAuthKey {
     Rsa { modulus: BigInt, exponent: BigInt },
@@ -869,6 +870,44 @@ impl RarimePassport {
         let proof_provider = ProofProvider::new();
         let register_proof = proof_provider
             .generate_lite_proof(parsed_hash_algorithm.get_byte_length(), proof_inputs)?;
+
+        return Ok(register_proof);
+    }
+
+    pub fn generate_query_proof(
+        &self,
+        params: QueryProofParams,
+        private_key: &[u8; 32],
+    ) -> Result<Vec<u8>, RarimeError> {
+        let proof_inputs = QueryProofInput {
+            event_id: params.event_id,     //from input
+            event_data: params.event_data, //from input
+            id_state_root: "".to_string(), //from SMT
+            selector: params.selector,     //from input
+            current_date: "".to_string(),
+            timestamp_lowerbound: params.timestamp_lowerbound, //from input
+            timestamp_upperbound: params.timestamp_upperbound, //from input
+            identity_count_lowerbound: params.identity_count_lowerbound, //from input
+            identity_count_upperbound: params.identity_count_upperbound, //from input
+            birth_date_lowerbound: params.birth_date_lowerbound, //from input
+            birth_date_upperbound: params.birth_date_upperbound, //from input
+            expiration_date_lowerbound: params.expiration_date_lowerbound, //from input
+            expiration_date_upperbound: params.expiration_date_upperbound, //from input
+            citizenship_mask: params.citizenship_mask,         //from input
+            sk_identity: BigUint::from_bytes_be(private_key).to_str_radix(10),
+            pk_passport_hash: "".to_string(), //????
+            dg1: self.data_group1.clone(),
+            siblings: vec![], //from SMT
+            timestamp: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Failed to get system time")
+                .as_secs()
+                .to_string(),
+            identity_counter: "".to_string(), //???
+        };
+
+        let proof_provider = ProofProvider::new();
+        let register_proof = proof_provider.generate_query_proof(proof_inputs)?;
 
         return Ok(register_proof);
     }

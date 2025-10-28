@@ -35,6 +35,22 @@ mod utils;
 uniffi::include_scaffolding!("rarime_rust_sdk");
 
 #[derive(Debug, Clone)]
+pub struct QueryProofParams {
+    pub event_id: String,
+    pub event_data: String,
+    pub selector: String,
+    pub timestamp_lowerbound: String,
+    pub timestamp_upperbound: String,
+    pub identity_count_lowerbound: String,
+    pub identity_count_upperbound: String,
+    pub birth_date_lowerbound: String,
+    pub birth_date_upperbound: String,
+    pub expiration_date_lowerbound: String,
+    pub expiration_date_upperbound: String,
+    pub citizenship_mask: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct RarimeUserConfiguration {
     pub user_private_key: Vec<u8>,
 }
@@ -229,6 +245,19 @@ impl Rarime {
         let tx_hash = lite_register_response.data.attributes.tx_hash;
 
         return Ok(tx_hash);
+    }
+
+    pub async fn generate_query_proof(
+        &self,
+        passport: RarimePassport,
+        query_params: QueryProofParams,
+    ) -> Result<Vec<u8>, RarimeError> {
+        let private_key_validate =
+            vec_u8_to_u8_32(&self.config.user_configuration.user_private_key)?;
+
+        let proof = passport.generate_query_proof(query_params, &private_key_validate)?;
+
+        return Ok(proof);
     }
 }
 
