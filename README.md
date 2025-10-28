@@ -108,7 +108,7 @@ We support two chains:
 |---------------------------------|----------------------------------------------|----------------------------------------------|
 | `STATE_KEEPER_CONTRACT_ADDRESS` | `0x61aa5b68D811884dA4FEC2De4a7AA0464df166E1` | `0x9EDADB216C1971cf0343b8C687cF76E7102584DB` |
 | `REGISTER_CONTRACT_ADDRESS`     | `0x497D6957729d3a39D43843BD27E6cbD12310F273` | `0xd63782478CA40b587785700Ce49248775398b045` |
-| `POSEIDON_SMT`                  | `0x479F84502Db545FA8d2275372E0582425204A879` | `0xF19a85B10d705Ed3bAF3c0eCe3E73d8077Bf6481` |
+| `POSEIDON_SMT_ADDRESS`          | `0x479F84502Db545FA8d2275372E0582425204A879` | `0xF19a85B10d705Ed3bAF3c0eCe3E73d8077Bf6481` |
 
 ---
 
@@ -131,7 +131,8 @@ We support two chains:
 
     val confContract = RarimeContractsConfiguration(
         stateKeeperContractAddress = "<STATE_KEEPER_CONTRACT_ADDRESS>",
-         registerContractAddress = "<REGISTER_CONTRACT_ADDRESS>"
+        registerContractAddress = "<REGISTER_CONTRACT_ADDRESS>",
+        poseidonSMT = "<POSEIDON_SMT_ADDRESS>"
     )
 
     val rarimeConfiguration = RarimeConfiguration(
