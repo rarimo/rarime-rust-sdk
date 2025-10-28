@@ -3,6 +3,6 @@ fn main() {
 
     println!("cargo:rerun-if-changed={}", udl_file);
 
-    uniffi_build::generate_scaffolding_for_crate(udl_file, "rarime_rust_sdk")
-        .expect("Error generating scaffolding");
+    // uniffi_build::generate_scaffolding_for_crate(udl_file, "rarime_rust_sdk")
+    //     .expect("Error generating scaffolding");
 }
