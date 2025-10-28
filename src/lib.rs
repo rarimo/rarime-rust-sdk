@@ -31,8 +31,8 @@ mod signature_algorithm;
 mod treap_tree;
 mod utils;
 
-// UniFFI setup
-uniffi::include_scaffolding!("rarime_rust_sdk");
+// // UniFFI setup
+// uniffi::include_scaffolding!("rarime_rust_sdk");
 
 #[derive(Debug, Clone)]
 pub struct QueryProofParams {
@@ -64,6 +64,7 @@ pub struct RarimeAPIConfiguration {
 pub struct RarimeContractsConfiguration {
     pub state_keeper_contract_address: String,
     pub register_contract_address: String,
+    pub poseidon_smt_address: String,
 }
 
 #[derive(Debug, Clone)]
@@ -97,6 +98,12 @@ impl Rarime {
                 .config
                 .contracts_configuration
                 .state_keeper_contract_address
+                .clone(),
+
+            poseidon_smt_address: self
+                .config
+                .contracts_configuration
+                .poseidon_smt_address
                 .clone(),
         };
 
@@ -252,10 +259,28 @@ impl Rarime {
         passport: RarimePassport,
         query_params: QueryProofParams,
     ) -> Result<Vec<u8>, RarimeError> {
-        let private_key_validate =
-            vec_u8_to_u8_32(&self.config.user_configuration.user_private_key)?;
+        let config = ContractsProviderConfig {
+            rpc_url: self.config.api_configuration.json_rpc_evm_url.clone(),
+            state_keeper_contract_address: self
+                .config
+                .contracts_configuration
+                .state_keeper_contract_address
+                .clone(),
 
-        let proof = passport.generate_query_proof(query_params, &private_key_validate)?;
+            poseidon_smt_address: self
+                .config
+                .contracts_configuration
+                .poseidon_smt_address
+                .clone(),
+        };
+
+        let passport_key = passport.get_passport_key()?;
+
+        let pk_u8_32: [u8; 32] = vec_u8_to_u8_32(&self.config.user_configuration.user_private_key)?;
+
+        let proof = passport
+            .generate_query_proof(query_params, &passport_key, &pk_u8_32, config)
+            .await?;
 
         return Ok(proof);
     }

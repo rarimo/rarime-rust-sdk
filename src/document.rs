@@ -2,12 +2,12 @@ use crate::hash_algorithm::HashAlgorithm;
 use crate::signature_algorithm::SignatureAlgorithm;
 use crate::utils::{convert_asn1_to_pem, extract_oid_from_asn1, poseidon_hash_32_bytes};
 use crate::{QueryProofParams, RarimeError};
+use chrono::{Datelike, Utc};
 use contracts::{ContractsProvider, ContractsProviderConfig};
 use num_bigint::BigInt;
 use num_traits::{One, Zero};
 use proofs::{LiteRegisterProofInput, ProofProvider, QueryProofInput};
 use simple_asn1::{ASN1Block, ASN1Class, BigUint, from_der, to_der};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 enum ActiveAuthKey {
     Rsa { modulus: BigInt, exponent: BigInt },
@@ -874,17 +874,30 @@ impl RarimePassport {
         return Ok(register_proof);
     }
 
-    pub fn generate_query_proof(
+    pub async fn generate_query_proof(
         &self,
         params: QueryProofParams,
+        passport_key: &[u8; 32],
         private_key: &[u8; 32],
+        config: ContractsProviderConfig,
     ) -> Result<Vec<u8>, RarimeError> {
+        let contacts = ContractsProvider::new(config);
+        let smt_proof = contacts.get_smt_proof(passport_key).await?;
+        let test = contacts.get_passport_info(passport_key).await?;
+
+        let now_time = Utc::now();
+
         let proof_inputs = QueryProofInput {
-            event_id: params.event_id,     //from input
-            event_data: params.event_data, //from input
-            id_state_root: "".to_string(), //from SMT
-            selector: params.selector,     //from input
-            current_date: "".to_string(),
+            event_id: params.event_id,                  //from input
+            event_data: params.event_data,              //from input
+            id_state_root: hex::encode(smt_proof.root), //from SMT
+            selector: params.selector,                  //from input
+            current_date: format!(
+                "{:02}{:02}{:02}",
+                now_time.year() % 100,
+                now_time.month(),
+                now_time.day()
+            ),
             timestamp_lowerbound: params.timestamp_lowerbound, //from input
             timestamp_upperbound: params.timestamp_upperbound, //from input
             identity_count_lowerbound: params.identity_count_lowerbound, //from input
@@ -895,15 +908,15 @@ impl RarimePassport {
             expiration_date_upperbound: params.expiration_date_upperbound, //from input
             citizenship_mask: params.citizenship_mask,         //from input
             sk_identity: BigUint::from_bytes_be(private_key).to_str_radix(10),
-            pk_passport_hash: "".to_string(), //????
+            pk_passport_hash: hex::encode(self.get_passport_key()?),
             dg1: self.data_group1.clone(),
-            siblings: vec![], //from SMT
-            timestamp: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("Failed to get system time")
-                .as_secs()
-                .to_string(),
-            identity_counter: "".to_string(), //???
+            siblings: smt_proof
+                .siblings
+                .iter()
+                .map(|block| hex::encode(block))
+                .collect(), //from SMT
+            timestamp: now_time.timestamp().to_string(),
+            identity_counter: test.passportInfo_.identityReissueCounter.to_string(),
         };
 
         let proof_provider = ProofProvider::new();
