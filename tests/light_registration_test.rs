@@ -30,6 +30,10 @@ mod tests {
             },
         };
 
+        dbg!(hex::encode(
+            &rarime_config.user_configuration.user_private_key
+        ));
+
         let rarime = Rarime::new(rarime_config).unwrap();
 
         let passport = RarimePassport {
@@ -56,4 +60,29 @@ mod tests {
 
         dbg!(result);
     }
+
+    //     #[test]
+    //     fn test() {
+    //         let passport_key_str = "5644108600761920898029116442473121668370222676924692844158653099298430003978";
+    //         let identity_key_str = "3780309553286379199414996488181274105128323336202740609595406896565517347464";
+    //
+    //         let passport_bigint = BigInt::from_str(passport_key_str).unwrap();
+    //         let identity_bigint = BigInt::from_str(identity_key_str).unwrap();
+    // dbg!(&passport_bigint);
+    //         dbg!(&identity_bigint);
+    //
+    //         let passport_key_vec: Vec<u8> = passport_bigint.to_bytes_be().1;
+    //         let identity_key_vec: Vec<u8> = identity_bigint.to_bytes_be().1;
+    //
+    //
+    //
+    //         let passport_key_u8_32  = vec_u8_to_u8_32(&passport_key_vec).unwrap();
+    //         let identity_key_u8_32  = vec_u8_to_u8_32(&identity_key_vec).unwrap();
+    //
+    //
+    //         let result = get_smt_proof_index(&passport_key_u8_32, &identity_key_u8_32).unwrap();
+    //
+    //
+    //         dbg!(result);
+    //     }
 }

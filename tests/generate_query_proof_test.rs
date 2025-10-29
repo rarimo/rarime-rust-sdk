@@ -4,13 +4,13 @@ mod tests {
     use base64::engine::general_purpose::STANDARD;
     use rarime_rust_sdk::{
         QueryProofParams, Rarime, RarimeAPIConfiguration, RarimeConfiguration,
-        RarimeContractsConfiguration, RarimePassport, RarimeUserConfiguration, RarimeUtils,
+        RarimeContractsConfiguration, RarimePassport, RarimeUserConfiguration,
     };
     use serde_json::Value;
     use std::fs;
 
     #[tokio::test]
-    async fn test_light_registration() {
+    async fn test_query_proof() {
         let json_string = fs::read_to_string("./tests/assets/passports/id_card3.json").unwrap();
         let json_value: Value = serde_json::from_str(&json_string).unwrap();
 
@@ -26,7 +26,10 @@ mod tests {
                 rarime_api_url: "https://api.orgs.app.stage.rarime.com".to_string(),
             },
             user_configuration: RarimeUserConfiguration {
-                user_private_key: RarimeUtils.generate_bjj_private_key().unwrap(),
+                user_private_key: hex::decode(
+                    "0a790217c78ea3fe909b34e5f911a2a0556e06b18c2324027b2a045ac05430c3",
+                )
+                .unwrap(),
             },
         };
 
@@ -49,27 +52,31 @@ mod tests {
         };
 
         let query_params = QueryProofParams {
-            event_id: "".to_string(),
-            event_data: "".to_string(),
-            selector: "".to_string(),
-            timestamp_lowerbound: "".to_string(),
-            timestamp_upperbound: "".to_string(),
-            identity_count_lowerbound: "".to_string(),
-            identity_count_upperbound: "".to_string(),
-            birth_date_lowerbound: "".to_string(),
-            birth_date_upperbound: "".to_string(),
-            expiration_date_lowerbound: "".to_string(),
-            expiration_date_upperbound: "".to_string(),
-            citizenship_mask: "".to_string(),
+            event_id: "43580365239758335475".to_string(),
+            event_data: "0x98d622d3d4ede97469fb2152b1c9d4e4470b354db2c07afaa3846ca0d885af"
+                .to_string(),
+            selector: "0".to_string(),
+            timestamp_lowerbound: "0".to_string(),
+            timestamp_upperbound: "0".to_string(),
+            identity_count_lowerbound: "0".to_string(),
+            identity_count_upperbound: "0".to_string(),
+            birth_date_lowerbound: "0x303030303030".to_string(),
+            birth_date_upperbound: "0x303030303030".to_string(),
+            expiration_date_lowerbound: "0x303030303030".to_string(),
+            expiration_date_upperbound: "0x303030303030".to_string(),
+            citizenship_mask: "0x00".to_string(),
         };
 
-        let result = tokio::task::spawn_blocking(move || {
-            futures::executor::block_on(rarime.generate_query_proof(passport, query_params))
+        let result = tokio::task::spawn_blocking({
+            let passport = passport.clone();
+            let query_params = query_params.clone();
+            let rarime = rarime.clone();
+            move || futures::executor::block_on(rarime.generate_query_proof(passport, query_params))
         })
         .await
         .unwrap()
         .unwrap();
 
-        dbg!(result);
+        dbg!(hex::encode(&result));
     }
 }
