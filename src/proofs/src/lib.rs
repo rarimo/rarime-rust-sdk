@@ -82,6 +82,7 @@ impl ProofProvider {
         // despite the misleading 'ultra_plonk' name
         let (proof, _) = prove_ultra_plonk(bytecode, initial_witness, false)
             .map_err(|e| ProofError::ProvingError(e))?;
+
         return Ok(proof);
     }
 
@@ -134,6 +135,7 @@ impl ProofProvider {
         // despite the misleading 'ultra_plonk' name
         let (proof, _) = prove_ultra_plonk(bytecode, initial_witness, false)
             .map_err(|e| ProofError::ProvingError(e))?;
+
         return Ok(proof);
     }
 }
