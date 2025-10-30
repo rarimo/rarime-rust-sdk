@@ -165,9 +165,6 @@ pub fn get_smt_proof_index(
     let passport_key_big_int = BigInt::from_bytes_be(Sign::Plus, passport_key);
     let profile_key_big_int = BigInt::from_bytes_be(Sign::Plus, profile_key);
 
-    dbg!(&passport_key_big_int);
-    dbg!(&profile_key_big_int);
-
     let result = poseidon_hash_32_bytes(&[passport_key_big_int, profile_key_big_int])?;
 
     return Ok(result);
