@@ -74,6 +74,7 @@ pub struct RarimeConfiguration {
     pub user_configuration: RarimeUserConfiguration,
 }
 
+#[derive(Debug, Clone)]
 pub struct Rarime {
     config: RarimeConfiguration,
 }
