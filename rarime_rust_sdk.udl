@@ -25,7 +25,7 @@ enum RarimeError {
     "ProveError",
     "ApiError",
     "DecodeHexError",
-    "GetProfileKeyError",
+    "ProfileKeyError",
     "SetupSDKError",
 };
 
