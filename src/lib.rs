@@ -280,7 +280,7 @@ impl Rarime {
         let pk_u8_32: [u8; 32] = vec_u8_to_u8_32(&self.config.user_configuration.user_private_key)?;
 
         let proof = passport
-            .generate_query_proof(query_params, &passport_key, &pk_u8_32, config)
+            .generate_document_query_proof(query_params, &passport_key, &pk_u8_32, config)
             .await?;
 
         return Ok(proof);
