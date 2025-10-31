@@ -877,7 +877,7 @@ impl RarimePassport {
         return Ok(register_proof);
     }
 
-    pub async fn generate_query_proof(
+    pub async fn generate_document_query_proof(
         &self,
         params: QueryProofParams,
         passport_key: &[u8; 32],
@@ -891,6 +891,13 @@ impl RarimePassport {
         let profile_key = vec_u8_to_u8_32(&utils.get_profile_key(pk_key.to_vec())?)?;
 
         let passport_info = contacts.get_passport_info(&passport_key).await?;
+
+        if (profile_key != passport_info.passportInfo_.activeIdentity) {
+            return Err(RarimeError::ProfileKeyError(
+                "profile key mismatch".to_string(),
+            ));
+        }
+
         let smt_proof_index = get_smt_proof_index(&passport_key, &profile_key)?;
 
         let smt_proof = contacts.get_smt_proof(&smt_proof_index).await?;
@@ -931,8 +938,8 @@ impl RarimePassport {
         };
 
         let proof_provider = ProofProvider::new();
-        let register_proof = proof_provider.generate_query_proof(proof_inputs)?;
+        let query_proof = proof_provider.generate_query_proof(proof_inputs)?;
 
-        return Ok(register_proof);
+        return Ok(query_proof);
     }
 }
