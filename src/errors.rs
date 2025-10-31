@@ -57,8 +57,8 @@ pub enum RarimeError {
     ApiError(#[from] ApiError),
     #[error("Decode hex error: {0}")]
     DecodeHexError(#[from] FromHexError),
-    #[error("Get profile key error: {0}")]
-    GetProfileKeyError(String),
+    #[error("Profile key error: {0}")]
+    ProfileKeyError(String),
     #[error("Setup SDK process error: {0}")]
     SetupSDKError(String),
 }
