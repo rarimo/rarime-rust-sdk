@@ -893,9 +893,11 @@ impl RarimePassport {
         let passport_info = contacts.get_passport_info(&passport_key).await?;
 
         if (profile_key != passport_info.passportInfo_.activeIdentity) {
-            return Err(RarimeError::ProfileKeyError(
-                "profile key mismatch".to_string(),
-            ));
+            return Err(RarimeError::ProfileKeyError(format!(
+                "profile key mismatch. profile_key = {},   passport_info.passportInfo_.activeIdentity= {}",
+                hex::encode(profile_key),
+                hex::encode(passport_info.passportInfo_.activeIdentity)
+            )));
         }
 
         let smt_proof_index = get_smt_proof_index(&passport_key, &profile_key)?;
