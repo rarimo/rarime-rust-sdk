@@ -35,6 +35,22 @@ mod utils;
 uniffi::include_scaffolding!("rarime_rust_sdk");
 
 #[derive(Debug, Clone)]
+pub struct QueryProofParams {
+    pub event_id: String,
+    pub event_data: String,
+    pub selector: String,
+    pub timestamp_lowerbound: String,
+    pub timestamp_upperbound: String,
+    pub identity_count_lowerbound: String,
+    pub identity_count_upperbound: String,
+    pub birth_date_lowerbound: String,
+    pub birth_date_upperbound: String,
+    pub expiration_date_lowerbound: String,
+    pub expiration_date_upperbound: String,
+    pub citizenship_mask: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct RarimeUserConfiguration {
     pub user_private_key: Vec<u8>,
 }
@@ -48,6 +64,7 @@ pub struct RarimeAPIConfiguration {
 pub struct RarimeContractsConfiguration {
     pub state_keeper_contract_address: String,
     pub register_contract_address: String,
+    pub poseidon_smt_address: String,
 }
 
 #[derive(Debug, Clone)]
@@ -57,6 +74,7 @@ pub struct RarimeConfiguration {
     pub user_configuration: RarimeUserConfiguration,
 }
 
+#[derive(Debug, Clone)]
 pub struct Rarime {
     config: RarimeConfiguration,
 }
@@ -81,6 +99,12 @@ impl Rarime {
                 .config
                 .contracts_configuration
                 .state_keeper_contract_address
+                .clone(),
+
+            poseidon_smt_address: self
+                .config
+                .contracts_configuration
+                .poseidon_smt_address
                 .clone(),
         };
 
@@ -229,6 +253,37 @@ impl Rarime {
         let tx_hash = lite_register_response.data.attributes.tx_hash;
 
         return Ok(tx_hash);
+    }
+
+    pub async fn generate_query_proof(
+        &self,
+        passport: RarimePassport,
+        query_params: QueryProofParams,
+    ) -> Result<Vec<u8>, RarimeError> {
+        let config = ContractsProviderConfig {
+            rpc_url: self.config.api_configuration.json_rpc_evm_url.clone(),
+            state_keeper_contract_address: self
+                .config
+                .contracts_configuration
+                .state_keeper_contract_address
+                .clone(),
+
+            poseidon_smt_address: self
+                .config
+                .contracts_configuration
+                .poseidon_smt_address
+                .clone(),
+        };
+
+        let passport_key = passport.get_passport_key()?;
+
+        let pk_u8_32: [u8; 32] = vec_u8_to_u8_32(&self.config.user_configuration.user_private_key)?;
+
+        let proof = passport
+            .generate_document_query_proof(query_params, &passport_key, &pk_u8_32, config)
+            .await?;
+
+        return Ok(proof);
     }
 }
 

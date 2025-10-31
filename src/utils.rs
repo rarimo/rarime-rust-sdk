@@ -4,7 +4,7 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use const_oid::ObjectIdentifier;
 use ff::{PrimeField, PrimeFieldRepr};
-use num_bigint::BigInt;
+use num_bigint::{BigInt, Sign};
 use num_traits::Zero;
 use poseidon_rs::{Fr, FrRepr};
 use simple_asn1::{ASN1Block, to_der};
@@ -107,11 +107,11 @@ pub fn poseidon_hash_32_bytes(vec_big_int: &[BigInt]) -> Result<[u8; 32], Rarime
     repr.write_be(&mut raw_hash_bytes)
         .expect("Error converting repr to bytes");
 
-    let result_big_int = BigInt::from_bytes_be(num_bigint::Sign::Plus, &raw_hash_bytes);
+    let result_big_int = BigInt::from_bytes_be(Sign::Plus, &raw_hash_bytes);
 
-    let big_int_32 = big_int_to_32_bytes(&result_big_int);
+    let big_int_32_bytes = big_int_to_32_bytes(&result_big_int);
 
-    Ok(big_int_32)
+    Ok(big_int_32_bytes)
 }
 
 pub fn extract_oid_from_asn1(oid_block: &ASN1Block) -> Result<ObjectIdentifier, RarimeError> {
@@ -151,9 +151,19 @@ pub fn convert_asn1_to_pem(asn1_block: &ASN1Block) -> Result<String, RarimeError
 
 pub fn vec_u8_to_u8_32(vec: &Vec<u8>) -> Result<[u8; 32], RarimeError> {
     let result: [u8; 32] = vec.as_slice().try_into().map_err(|_| {
-        crate::errors::RarimeError::GetProfileKeyError(
-            "Private key must be 32 bytes in length.".to_string(),
-        )
+        RarimeError::ProfileKeyError("Private key must be 32 bytes in length.".to_string())
     })?;
+    return Ok(result);
+}
+
+pub fn get_smt_proof_index(
+    passport_key: &[u8; 32],
+    profile_key: &[u8; 32],
+) -> Result<[u8; 32], RarimeError> {
+    let passport_key_big_int = BigInt::from_bytes_be(Sign::Plus, passport_key);
+    let profile_key_big_int = BigInt::from_bytes_be(Sign::Plus, profile_key);
+
+    let result = poseidon_hash_32_bytes(&[passport_key_big_int, profile_key_big_int])?;
+
     return Ok(result);
 }

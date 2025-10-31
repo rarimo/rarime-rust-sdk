@@ -1,11 +1,15 @@
-use crate::RarimeError;
 use crate::hash_algorithm::HashAlgorithm;
 use crate::signature_algorithm::SignatureAlgorithm;
-use crate::utils::{convert_asn1_to_pem, extract_oid_from_asn1, poseidon_hash_32_bytes};
+use crate::utils::{
+    convert_asn1_to_pem, extract_oid_from_asn1, get_smt_proof_index, poseidon_hash_32_bytes,
+    vec_u8_to_u8_32,
+};
+use crate::{QueryProofParams, RarimeError, RarimeUtils};
+use chrono::Utc;
 use contracts::{ContractsProvider, ContractsProviderConfig};
 use num_bigint::BigInt;
 use num_traits::{One, Zero};
-use proofs::{LiteProofInput, ProofProvider};
+use proofs::{LiteRegisterProofInput, ProofProvider, QueryProofInput};
 use simple_asn1::{ASN1Block, ASN1Class, BigUint, from_der, to_der};
 
 enum ActiveAuthKey {
@@ -861,14 +865,83 @@ impl RarimePassport {
 
         let parsed_oid = extract_oid_from_asn1(&dg_algo_block)?;
         let parsed_hash_algorithm = HashAlgorithm::from_oid(parsed_oid)?;
-        let proof_inputs = LiteProofInput {
+        let proof_inputs = LiteRegisterProofInput {
             dg1: self.data_group1.clone(),
             sk: BigUint::from_bytes_be(private_key).to_str_radix(10),
         };
 
-        let proof_provider = ProofProvider::new(parsed_hash_algorithm.get_byte_length());
-        let register_proof = proof_provider.generate_lite_proof(proof_inputs)?;
+        let proof_provider = ProofProvider::new();
+        let register_proof = proof_provider
+            .generate_lite_proof(parsed_hash_algorithm.get_byte_length(), proof_inputs)?;
 
         return Ok(register_proof);
+    }
+
+    pub async fn generate_document_query_proof(
+        &self,
+        params: QueryProofParams,
+        passport_key: &[u8; 32],
+        pk_key: &[u8; 32],
+        config: ContractsProviderConfig,
+    ) -> Result<Vec<u8>, RarimeError> {
+        let contacts = ContractsProvider::new(config);
+
+        let utils = RarimeUtils::new();
+
+        let profile_key = vec_u8_to_u8_32(&utils.get_profile_key(pk_key.to_vec())?)?;
+
+        let passport_info = contacts.get_passport_info(&passport_key).await?;
+
+        if (profile_key != passport_info.passportInfo_.activeIdentity) {
+            return Err(RarimeError::ProfileKeyError(format!(
+                "profile key mismatch. profile_key = {},   passport_info.passportInfo_.activeIdentity= {}",
+                hex::encode(profile_key),
+                hex::encode(passport_info.passportInfo_.activeIdentity)
+            )));
+        }
+
+        let smt_proof_index = get_smt_proof_index(&passport_key, &profile_key)?;
+
+        let smt_proof = contacts.get_smt_proof(&smt_proof_index).await?;
+
+        let now_time = Utc::now();
+
+        let proof_inputs = QueryProofInput {
+            event_id: params.event_id, //from input
+            event_data: BigUint::from_bytes_be(&hex::decode(
+                params.event_data.chars().skip(2).collect::<String>(),
+            )?)
+            .to_str_radix(10),
+            id_state_root: BigUint::from_bytes_be(smt_proof.root.as_slice()).to_str_radix(10), //from SMT
+            selector: params.selector, //from input
+            current_date: format!("0x{}", hex::encode(now_time.format("%y%m%d").to_string())),
+            timestamp_lowerbound: params.timestamp_lowerbound, //from input
+            timestamp_upperbound: params.timestamp_upperbound, //from input
+            identity_count_lowerbound: params.identity_count_lowerbound, //from input
+            identity_count_upperbound: params.identity_count_upperbound, //from input
+            birth_date_lowerbound: params.birth_date_lowerbound, //from input
+            birth_date_upperbound: params.birth_date_upperbound, //from input
+            expiration_date_lowerbound: params.expiration_date_lowerbound, //from input
+            expiration_date_upperbound: params.expiration_date_upperbound, //from input
+            citizenship_mask: params.citizenship_mask,         //from input
+            sk_identity: BigUint::from_bytes_be(pk_key).to_str_radix(10),
+            pk_passport_hash: BigUint::from_bytes_be(&self.get_passport_key()?).to_str_radix(10),
+            dg1: self.data_group1.clone(),
+            siblings: smt_proof
+                .siblings
+                .iter()
+                .map(|block| BigUint::from_bytes_be(block.as_slice()).to_str_radix(10))
+                .collect(), //from SMT
+            timestamp: passport_info.identityInfo_.issueTimestamp.to_string(),
+            identity_counter: passport_info
+                .passportInfo_
+                .identityReissueCounter
+                .to_string(),
+        };
+
+        let proof_provider = ProofProvider::new();
+        let query_proof = proof_provider.generate_query_proof(proof_inputs)?;
+
+        return Ok(query_proof);
     }
 }
