@@ -1,7 +1,8 @@
 use api::errors::ApiError;
 use base64::DecodeError;
-use contracts::ContractsError;
+use contracts::errors::ContractsError;
 use hex::FromHexError;
+use num_bigint::ParseBigIntError;
 use proofs::ProofError;
 use thiserror::Error;
 
@@ -61,4 +62,6 @@ pub enum RarimeError {
     ProfileKeyError(String),
     #[error("Setup SDK process error: {0}")]
     SetupSDKError(String),
+    #[error("Failed parse bigint error: {0}")]
+    ParseBigIntError(#[from] ParseBigIntError),
 }
