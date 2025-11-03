@@ -16,14 +16,16 @@ mod tests {
 
         let rarime_config = RarimeConfiguration {
             contracts_configuration: RarimeContractsConfiguration {
-                state_keeper_contract_address: "0x9EDADB216C1971cf0343b8C687cF76E7102584DB"
-                    .to_string(),
+                state_keeper_address: "0x9EDADB216C1971cf0343b8C687cF76E7102584DB".to_string(),
                 register_contract_address: "0xd63782478CA40b587785700Ce49248775398b045".to_string(),
                 poseidon_smt_address: "".to_string(),
+                proposals_state_address: "".to_string(),
             },
             api_configuration: RarimeAPIConfiguration {
                 json_rpc_evm_url: "https://rpc.evm.mainnet.rarimo.com".to_string(),
                 rarime_api_url: "https://api.orgs.app.stage.rarime.com".to_string(),
+                voting_rpc_url: "".to_string(),
+                ipfs_url: "".to_string(),
             },
             user_configuration: RarimeUserConfiguration {
                 user_private_key: RarimeUtils.generate_bjj_private_key().unwrap(),
