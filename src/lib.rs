@@ -4,18 +4,24 @@ pub use crate::errors::RarimeError;
 use crate::utils::vec_u8_to_u8_32;
 use ::base64::Engine;
 use ::base64::engine::general_purpose::STANDARD;
-use api::ApiProvider;
+use api::types::ipfs_voting::IPFSResponseData;
 pub use api::types::relayer_light_register::{
     LiteRegisterData, LiteRegisterRequest, LiteRegisterResponse, LiteRegisterResponseBody,
     RegisterResponseAttributes,
 };
 use api::types::verify_sod::{Attributes, Data, DocumentSod, VerifySodRequest, VerifySodResponse};
-use contracts::ContractsProviderConfig;
+use api::{ApiProvider, IPFSApiProvider};
+use contracts::ProposalsState::ProposalInfo;
 use contracts::RegistrationSimple::{Passport, registerSimpleViaNoirCall};
 use contracts::call_data_builder::CallDataBuilder;
 use contracts::utils::convert_to_u256;
+use contracts::{
+    IdentityContractsProviderConfig, VotingContractsProvider, VotingContractsProviderConfig,
+};
 pub use document::RarimePassport;
+use num_traits::ToBytes;
 use simple_asn1::to_der;
+use std::str::FromStr;
 pub use utils::rarime_utils;
 
 pub mod masters_certificate_pool;
@@ -31,8 +37,8 @@ mod signature_algorithm;
 mod treap_tree;
 mod utils;
 
-// UniFFI setup
-uniffi::include_scaffolding!("rarime_rust_sdk");
+// /// UniFFI setup
+// uniffi::include_scaffolding!("rarime_rust_sdk");
 
 #[derive(Debug, Clone)]
 pub struct QueryProofParams {
@@ -58,13 +64,16 @@ pub struct RarimeUserConfiguration {
 pub struct RarimeAPIConfiguration {
     pub json_rpc_evm_url: String,
     pub rarime_api_url: String,
+    pub voting_rpc_url: String,
+    pub ipfs_url: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct RarimeContractsConfiguration {
-    pub state_keeper_contract_address: String,
+    pub state_keeper_address: String,
     pub register_contract_address: String,
     pub poseidon_smt_address: String,
+    pub proposals_state_address: String,
 }
 
 #[derive(Debug, Clone)]
@@ -93,12 +102,12 @@ impl Rarime {
         &self,
         passport: RarimePassport,
     ) -> Result<DocumentStatus, RarimeError> {
-        let config = ContractsProviderConfig {
+        let config = IdentityContractsProviderConfig {
             rpc_url: self.config.api_configuration.json_rpc_evm_url.clone(),
             state_keeper_contract_address: self
                 .config
                 .contracts_configuration
-                .state_keeper_contract_address
+                .state_keeper_address
                 .clone(),
 
             poseidon_smt_address: self
@@ -260,12 +269,12 @@ impl Rarime {
         passport: RarimePassport,
         query_params: QueryProofParams,
     ) -> Result<Vec<u8>, RarimeError> {
-        let config = ContractsProviderConfig {
+        let config = IdentityContractsProviderConfig {
             rpc_url: self.config.api_configuration.json_rpc_evm_url.clone(),
             state_keeper_contract_address: self
                 .config
                 .contracts_configuration
-                .state_keeper_contract_address
+                .state_keeper_address
                 .clone(),
 
             poseidon_smt_address: self
@@ -284,6 +293,43 @@ impl Rarime {
             .await?;
 
         return Ok(proof);
+    }
+
+    /// This function returns data in JSON string format.
+    /// Make sure to parse it before using the result.
+    pub async fn get_polls_data_ipfs(
+        &self,
+        poll_id: String,
+    ) -> Result<IPFSResponseData, RarimeError> {
+        let proposal_data = self.get_polls_data_contract(poll_id).await?;
+
+        let ipfs_index = proposal_data.config.description;
+
+        let ipfs_provider = IPFSApiProvider::new(&self.config.api_configuration.ipfs_url)?;
+
+        let proposal_data = ipfs_provider.get_proposal_data(&ipfs_index).await?;
+
+        return Ok(proposal_data);
+    }
+
+    pub async fn get_polls_data_contract(
+        &self,
+        poll_id: String,
+    ) -> Result<ProposalInfo, RarimeError> {
+        let voting_contract_config = VotingContractsProviderConfig {
+            rpc_url: self.config.api_configuration.voting_rpc_url.clone(),
+            proposal_state_contract_address: self
+                .config
+                .contracts_configuration
+                .proposals_state_address
+                .clone(),
+        };
+
+        let voting_contract_provider = VotingContractsProvider::new(voting_contract_config);
+
+        let proposal_data = voting_contract_provider.get_proposal_info(&poll_id).await?;
+
+        Ok(proposal_data)
     }
 }
 
