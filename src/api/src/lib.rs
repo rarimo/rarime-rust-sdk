@@ -1,4 +1,5 @@
 use crate::errors::ApiError;
+use crate::types::ipfs_voting::IPFSResponseData;
 use crate::types::relayer_light_register::{LiteRegisterRequest, LiteRegisterResponse};
 use crate::types::verify_sod::{VerifySodRequest, VerifySodResponse};
 use reqwest::Client;
@@ -64,5 +65,37 @@ impl ApiProvider {
         let error_body = response.text().await?;
 
         Err(ApiError::HttpError { body: error_body })
+    }
+}
+
+pub struct IPFSApiProvider {
+    client: Client,
+    base_url: Url,
+}
+impl IPFSApiProvider {
+    pub fn new(base_url: &str) -> Result<Self, ApiError> {
+        Ok(IPFSApiProvider {
+            client: Client::new(),
+            base_url: Url::parse(base_url)?,
+        })
+    }
+    pub async fn get_proposal_data(&self, ipfs_id: &String) -> Result<IPFSResponseData, ApiError> {
+        let url = self
+            .base_url
+            .join(&format!("/ipfs/{}", ipfs_id))
+            .map_err(ApiError::UrlError)?;
+
+        let response = self.client.get(url).send().await?;
+
+        let status = response.status();
+
+        if status.is_success() {
+            let result: IPFSResponseData = response.json().await?;
+            return Ok(result);
+        }
+
+        let error_body = response.text().await?;
+
+        return Err(ApiError::HttpError { body: error_body });
     }
 }
