@@ -99,17 +99,18 @@ We support two chains:
 |----------------|------------------------------|-----------------------------------------|
 | `JSON_RPC_URL` | `https://l2.rarimo.com`      | `https://rpc.evm.mainnet.rarimo.com`    |
 | `API_URL`      | `https://api.app.rarime.com` | `https://api.orgs.app.stage.rarime.com` |
+| `IPFS_URL`     | `https://ipfs.rarimo.com `   | `https://ipfs.rarimo.com `              |
 
 ---
 
 ## Contract Addresses
 
-| Name                            | MainNet Address                              | TestNet Address                              |
-|---------------------------------|----------------------------------------------|----------------------------------------------|
-| `STATE_KEEPER_CONTRACT_ADDRESS` | `0x61aa5b68D811884dA4FEC2De4a7AA0464df166E1` | `0x9EDADB216C1971cf0343b8C687cF76E7102584DB` |
-| `REGISTER_CONTRACT_ADDRESS`     | `0x497D6957729d3a39D43843BD27E6cbD12310F273` | `0xd63782478CA40b587785700Ce49248775398b045` |
-| `POSEIDON_SMT_ADDRESS`          | `0x479F84502Db545FA8d2275372E0582425204A879` | `0xF19a85B10d705Ed3bAF3c0eCe3E73d8077Bf6481` |
-| `PROPOSAL_CONTRACT_ADDRESS`     | `0x9C4b84a940C9D3140a1F40859b3d4367DC8d099a` | `0x4C61d7454653720DAb9e26Ca25dc7B8a5cf7065b` |
+| Name                              | MainNet Address                              | TestNet Address                              |
+|-----------------------------------|----------------------------------------------|----------------------------------------------|
+| `STATE_KEEPER_CONTRACT_ADDRESS`   | `0x61aa5b68D811884dA4FEC2De4a7AA0464df166E1` | `0x9EDADB216C1971cf0343b8C687cF76E7102584DB` |
+| `REGISTER_CONTRACT_ADDRESS`       | `0x497D6957729d3a39D43843BD27E6cbD12310F273` | `0xd63782478CA40b587785700Ce49248775398b045` |
+| `POSEIDON_SMT_ADDRESS`            | `0x479F84502Db545FA8d2275372E0582425204A879` | `0xF19a85B10d705Ed3bAF3c0eCe3E73d8077Bf6481` |
+| `PROPOSAL_STATE_CONTRACT_ADDRESS` | `0x9C4b84a940C9D3140a1F40859b3d4367DC8d099a` | `0x4C61d7454653720DAb9e26Ca25dc7B8a5cf7065b` |
 
 ---
 
