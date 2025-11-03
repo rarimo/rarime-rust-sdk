@@ -6,7 +6,7 @@ use crate::utils::{
 };
 use crate::{QueryProofParams, RarimeError, RarimeUtils};
 use chrono::Utc;
-use contracts::{ContractsProvider, ContractsProviderConfig};
+use contracts::{IdentityContractsProvider, IdentityContractsProviderConfig};
 use num_bigint::BigInt;
 use num_traits::{One, Zero};
 use proofs::{LiteRegisterProofInput, ProofProvider, QueryProofInput};
@@ -36,9 +36,9 @@ pub struct RarimePassport {
 pub(crate) async fn get_document_status(
     passport_key: &[u8; 32],
     profile_key: &[u8; 32],
-    config: ContractsProviderConfig,
+    config: IdentityContractsProviderConfig,
 ) -> Result<DocumentStatus, RarimeError> {
-    let contacts = ContractsProvider::new(config);
+    let contacts = IdentityContractsProvider::new(config);
     let passport_info = contacts.get_passport_info(passport_key).await?;
 
     let zero_bytes: [u8; 32] = [0u8; 32];
@@ -882,9 +882,9 @@ impl RarimePassport {
         params: QueryProofParams,
         passport_key: &[u8; 32],
         pk_key: &[u8; 32],
-        config: ContractsProviderConfig,
+        config: IdentityContractsProviderConfig,
     ) -> Result<Vec<u8>, RarimeError> {
-        let contacts = ContractsProvider::new(config);
+        let contacts = IdentityContractsProvider::new(config);
 
         let utils = RarimeUtils::new();
 
