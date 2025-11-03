@@ -1,12 +1,21 @@
 pub mod call_data_builder;
+pub mod errors;
 mod poseidon_smt;
+mod proposals_state;
 mod state_keeper;
 pub mod utils;
 
+use crate::ProposalsState::ProposalInfo;
 use crate::SparseMerkleTree::Proof;
-use alloy::hex::FromHexError;
+use crate::errors::ContractsError;
 use alloy::sol;
-use thiserror::Error;
+
+sol!(
+    #[sol(rpc)]
+    #[derive(Debug)]
+    ProposalsState,
+    "src/abi/ProposalsState.json"
+);
 
 sol!(
     #[sol(rpc)]
@@ -30,18 +39,18 @@ sol!(
 );
 
 #[derive(Debug, Clone)]
-pub struct ContractsProviderConfig {
+pub struct IdentityContractsProviderConfig {
     pub rpc_url: String,
     pub state_keeper_contract_address: String,
     pub poseidon_smt_address: String,
 }
 
-pub struct ContractsProvider {
-    pub config: ContractsProviderConfig,
+pub struct IdentityContractsProvider {
+    config: IdentityContractsProviderConfig,
 }
 
-impl ContractsProvider {
-    pub fn new(config: ContractsProviderConfig) -> Self {
+impl IdentityContractsProvider {
+    pub fn new(config: IdentityContractsProviderConfig) -> Self {
         Self { config }
     }
 
@@ -57,14 +66,24 @@ impl ContractsProvider {
     }
 }
 
-#[derive(Debug, Error)]
-pub enum ContractsError {
-    #[error("Failed to parse the RPC URL: {0}")]
-    UrlParseError(#[from] url::ParseError),
+pub struct VotingContractsProviderConfig {
+    pub rpc_url: String,
+    pub proposal_state_contract_address: String,
+}
 
-    #[error("Failed to parse the contract address: {0}")]
-    AddressParseError(#[from] FromHexError),
+pub struct VotingContractsProvider {
+    config: VotingContractsProviderConfig,
+}
 
-    #[error("Contract call failed: {0}")]
-    ContractCallError(#[from] alloy::contract::Error),
+impl VotingContractsProvider {
+    pub fn new(config: VotingContractsProviderConfig) -> Self {
+        Self { config }
+    }
+
+    pub async fn get_proposal_info(
+        &self,
+        proposal_id: &String,
+    ) -> Result<ProposalInfo, ContractsError> {
+        proposals_state::get_proposal_info(&self.config, proposal_id).await
+    }
 }
