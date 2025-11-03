@@ -1,10 +1,10 @@
-use crate::{ContractsError, ContractsProviderConfig, StateKeeper};
+use crate::{ContractsError, IdentityContractsProviderConfig, StateKeeper};
 use alloy::primitives::Address;
 use alloy::providers::ProviderBuilder;
 use std::str::FromStr;
 
 pub(crate) async fn get_passport_info(
-    config: &ContractsProviderConfig,
+    config: &IdentityContractsProviderConfig,
     passport_key: &[u8; 32],
 ) -> Result<StateKeeper::getPassportInfoReturn, ContractsError> {
     let provider = ProviderBuilder::new().connect_http(config.rpc_url.parse()?);

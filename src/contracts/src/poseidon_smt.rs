@@ -1,11 +1,11 @@
 use crate::SparseMerkleTree::Proof;
-use crate::{ContractsError, ContractsProviderConfig, PoseidonSMT};
+use crate::{ContractsError, IdentityContractsProviderConfig, PoseidonSMT};
 use alloy::primitives::Address;
 use alloy::providers::ProviderBuilder;
 use std::str::FromStr;
 
 pub(crate) async fn get_proof_call(
-    config: &ContractsProviderConfig,
+    config: &IdentityContractsProviderConfig,
     key: &[u8; 32],
 ) -> Result<Proof, ContractsError> {
     let provider = ProviderBuilder::new().connect_http(config.rpc_url.parse()?);
