@@ -125,14 +125,11 @@ We support two chains:
     )
 
     val apiConfiguration = RarimeApiConfiguration(
-        jsonRpcEvmUrl = "<JSON_RPC_URL>",
-        rarimeApiUrl = "<API_URL>"
+        jsonRpcEvmUrl = "", rarimeApiUrl = ""
     )
 
     val confContract = RarimeContractsConfiguration(
-        stateKeeperContractAddress = "<STATE_KEEPER_CONTRACT_ADDRESS>",
-        registerContractAddress = "<REGISTER_CONTRACT_ADDRESS>",
-        poseidonSMT = "<POSEIDON_SMT_ADDRESS>"
+        stateKeeperContractAddress = "", registerContractAddress = "", poseidonSmtAddress = ""
     )
 
     val rarimeConfiguration = RarimeConfiguration(
@@ -144,8 +141,7 @@ We support two chains:
     ///Setup SDK
     val rarime = Rarime(config = rarimeConfiguration)
 
-    /// Setup passport
-    /// This is an example. Replace with your own data.
+    ///Setup passport
     val passport = RarimePassport(
         dataGroup1 = emptyList(),
         dataGroup15 = null,
@@ -154,16 +150,53 @@ We support two chains:
         sod = emptyList()
     )
 
-    ///Check passport status
-    ///Status may be :
-    ///    NOT_REGISTERED, // not register document
-    ///    REGISTERED_WITH_THIS_PK, // document was register with this user private key
-    ///    REGISTERED_WITH_OTHER_PK; // document was register with another user private key
+    /**
+     * Checks the passport registration status.
+     *
+     * Possible statuses:
+     * - NOT_REGISTERED – the document is not registered.
+     * - REGISTERED_WITH_THIS_PK – the document is registered with this user's private key.
+     * - REGISTERED_WITH_OTHER_PK – the document is registered with a different user's private key.
+     */
     val documentStatus = runBlocking { rarime.getDocumentStatus(passport) }
 
     ///Light registration
     ///Returned hash of register transaction from blockchain
     val tx_hash = runBlocking { rarime.lightRegistration(passport) }
+
+
+    ///Setup Query proof parameters
+    ///Replace placeholder values with your actual data
+    val queryProofParams = QueryProofParams(
+        eventId = "43580365239758335475",
+        eventData = "0x98d622d3d4ede97469fb2152b1c9d4e4470b354db2c07afaa3846ca0d885af",
+        selector = "3072",
+        timestampLowerbound = "0",
+        timestampUpperbound = "0",
+        identityCountLowerbound = "0",
+        identityCountUpperbound = "0",
+        birthDateLowerbound = "0x303030303030",
+        birthDateUpperbound = "0x303030303030",
+        expirationDateLowerbound = "0x303030303030",
+        expirationDateUpperbound = "0x303030303030",
+        citizenshipMask = "0x00"
+    )
+
+    /**
+     * Performs a zero-knowledge proof generation based on the provided query parameters.
+     *
+     * ⚠️ This is a computationally intensive cryptographic operation.
+     * Expected execution time: up to ~2 minutes depending on hardware.
+     * Memory usage may be significant (hundreds of MB or more).
+     *
+     * For best performance, execute this method in a background coroutine (`Dispatchers.Default`)
+     * or dedicated worker thread.
+     */
+    val queryProf = runBlocking {
+        rarime.generateQueryProof(
+            passport = passport, queryParams = queryProofParams
+        )
+    }
 
 ```
 
