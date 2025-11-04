@@ -125,11 +125,14 @@ We support two chains:
     )
 
     val apiConfiguration = RarimeApiConfiguration(
-        jsonRpcEvmUrl = "", rarimeApiUrl = ""
+        jsonRpcEvmUrl = "<JSON_RPC_URL>",
+        rarimeApiUrl = "<API_URL>"
     )
 
     val confContract = RarimeContractsConfiguration(
-        stateKeeperContractAddress = "", registerContractAddress = "", poseidonSmtAddress = ""
+        stateKeeperContractAddress = "<STATE_KEEPER_CONTRACT_ADDRESS>",
+        registerContractAddress = "<REGISTER_CONTRACT_ADDRESS>",
+        poseidonSmtAddress = "<POSEIDON_SMT_ADDRESS>"
     )
 
     val rarimeConfiguration = RarimeConfiguration(
@@ -186,7 +189,7 @@ We support two chains:
      * Performs a zero-knowledge proof generation based on the provided query parameters.
      *
      * ⚠️ This is a computationally intensive cryptographic operation.
-     * Expected execution time: up to ~2 minutes depending on hardware.
+     * Expected execution time: up to ~5 seconds depending on hardware.
      * Memory usage may be significant (hundreds of MB or more).
      *
      * For best performance, execute this method in a background coroutine (`Dispatchers.Default`)
