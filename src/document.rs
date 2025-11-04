@@ -1,12 +1,15 @@
 use crate::hash_algorithm::HashAlgorithm;
+use crate::rarimo_utils::RarimeUtils;
 use crate::signature_algorithm::SignatureAlgorithm;
 use crate::utils::{
     convert_asn1_to_pem, extract_oid_from_asn1, get_smt_proof_index, poseidon_hash_32_bytes,
     vec_u8_to_u8_32,
 };
-use crate::{QueryProofParams, RarimeError, RarimeUtils};
+use crate::{QueryProofParams, RarimeError};
 use chrono::Utc;
-use contracts::{IdentityContractsProvider, IdentityContractsProviderConfig};
+use contracts::ContractCallConfig;
+use contracts::contract::poseidon_smt::PoseidonSmtContract;
+use contracts::contract::state_keeper::StateKeeperContract;
 use num_bigint::BigInt;
 use num_traits::{One, Zero};
 use proofs::{LiteRegisterProofInput, ProofProvider, QueryProofInput};
@@ -36,9 +39,9 @@ pub struct RarimePassport {
 pub(crate) async fn get_document_status(
     passport_key: &[u8; 32],
     profile_key: &[u8; 32],
-    config: IdentityContractsProviderConfig,
+    config: ContractCallConfig,
 ) -> Result<DocumentStatus, RarimeError> {
-    let contacts = IdentityContractsProvider::new(config);
+    let contacts = StateKeeperContract::new(config);
     let passport_info = contacts.get_passport_info(passport_key).await?;
 
     let zero_bytes: [u8; 32] = [0u8; 32];
@@ -882,15 +885,15 @@ impl RarimePassport {
         params: QueryProofParams,
         passport_key: &[u8; 32],
         pk_key: &[u8; 32],
-        config: IdentityContractsProviderConfig,
+        state_keeper_config: ContractCallConfig,
+        poseidon_smt_config: ContractCallConfig,
     ) -> Result<Vec<u8>, RarimeError> {
-        let contacts = IdentityContractsProvider::new(config);
-
+        let state_keeper = StateKeeperContract::new(state_keeper_config);
         let utils = RarimeUtils::new();
 
         let profile_key = vec_u8_to_u8_32(&utils.get_profile_key(pk_key.to_vec())?)?;
 
-        let passport_info = contacts.get_passport_info(&passport_key).await?;
+        let passport_info = state_keeper.get_passport_info(&passport_key).await?;
 
         if (profile_key != passport_info.passportInfo_.activeIdentity) {
             return Err(RarimeError::ProfileKeyError(format!(
@@ -902,7 +905,8 @@ impl RarimePassport {
 
         let smt_proof_index = get_smt_proof_index(&passport_key, &profile_key)?;
 
-        let smt_proof = contacts.get_smt_proof(&smt_proof_index).await?;
+        let poseidon_smt = PoseidonSmtContract::new(poseidon_smt_config);
+        let smt_proof = poseidon_smt.get_proof_call(&smt_proof_index).await?;
 
         let now_time = Utc::now();
 
