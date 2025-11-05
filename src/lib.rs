@@ -1,13 +1,10 @@
 pub use crate::document::DocumentStatus;
 pub use crate::errors::RarimeError;
-use ::base64::Engine;
 pub use api::types::relayer_light_register::{
     LiteRegisterData, LiteRegisterRequest, LiteRegisterResponse, LiteRegisterResponseBody,
     RegisterResponseAttributes,
 };
 pub use document::RarimePassport;
-use num_traits::ToBytes;
-use std::str::FromStr;
 pub use utils::rarime_utils;
 
 mod base64;
@@ -24,6 +21,7 @@ pub mod rfc;
 mod signature_algorithm;
 mod treap_tree;
 mod utils;
+
 // /// UniFFI setup
 // uniffi::include_scaffolding!("rarime_rust_sdk");
 
@@ -41,4 +39,16 @@ pub struct QueryProofParams {
     pub expiration_date_lowerbound: String,
     pub expiration_date_upperbound: String,
     pub citizenship_mask: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct VotingCriteria {
+    pub selector: String,
+    pub citizenship_whitelist: Vec<String>,
+    pub timestamp_upperbound: String,
+    pub identity_count_upperbound: String,
+    pub sex: String,
+    pub birth_date_lowerbound: String,
+    pub birth_date_upperbound: String,
+    pub expiration_date_lowerbound: String,
 }
