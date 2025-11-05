@@ -1,3 +1,4 @@
+use alloy::dyn_abi::Error;
 use alloy::hex::FromHexError;
 use alloy::primitives::ruint::ParseError;
 use thiserror::Error;
@@ -15,4 +16,10 @@ pub enum ContractsError {
 
     #[error("Parse contract type error: {0}")]
     ParseContractTypeError(#[from] ParseError),
+
+    #[error("Parse contract dynamic types error: {0}")]
+    DynParseTypeError(#[from] Error),
+
+    #[error("Parse contract dynamic types error: {0}")]
+    DynStructTypeError(String),
 }
