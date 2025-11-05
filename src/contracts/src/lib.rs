@@ -12,6 +12,13 @@ use alloy::sol;
 sol!(
     #[sol(rpc)]
     #[derive(Debug)]
+    IdCardVoting,
+    "src/abi/IDCardVoting.json"
+);
+
+sol!(
+    #[sol(rpc)]
+    #[derive(Debug)]
     ProposalsState,
     "src/abi/ProposalsState.json"
 );
