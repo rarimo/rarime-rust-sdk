@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-alloy = { version = "1.0.35", features = ["full"] }
+alloy = { version = "1.0.35", features = ["full", "eip712"] }
 thiserror = "2.0.16"
 url = "2.5.7"
