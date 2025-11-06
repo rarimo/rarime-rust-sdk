@@ -1,6 +1,7 @@
 use crate::ContractsError;
 use alloy::dyn_abi::{DynSolType, DynSolValue};
 use alloy::primitives::{U256, Uint};
+use std::str::FromStr;
 
 pub fn convert_to_u256(bytes: &[u8; 32]) -> Result<Uint<256, 4>, ContractsError> {
     let result = U256::from_be_bytes(bytes.clone());
@@ -153,4 +154,9 @@ pub fn abi_decode_vote_criteria(
             other
         ))),
     }
+}
+
+pub fn u256_from_string(input: String) -> Result<U256, ContractsError> {
+    let result = U256::from_str(&input)?;
+    return Ok(result);
 }
