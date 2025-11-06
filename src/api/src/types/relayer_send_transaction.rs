@@ -17,3 +17,15 @@ pub struct SendTransactionAttributes {
     pub tx_data: String,
     pub destination: String,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SendTransactionResponse {
+    pub data: TxData,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TxData {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub transaction_type: String,
+}

@@ -1,7 +1,7 @@
 use crate::errors::ApiError;
 use crate::types::ipfs_voting::IPFSResponseData;
 use crate::types::relayer_light_register::{LiteRegisterRequest, LiteRegisterResponse};
-use crate::types::relayer_send_transaction::SendTransactionRequest;
+use crate::types::relayer_send_transaction::{SendTransactionRequest, SendTransactionResponse};
 use crate::types::verify_sod::{VerifySodRequest, VerifySodResponse};
 use reqwest::Client;
 use url::Url;
@@ -71,7 +71,7 @@ impl ApiProvider {
     pub async fn relayer_send_transaction(
         &self,
         request: &SendTransactionRequest,
-    ) -> Result<LiteRegisterResponse, ApiError> {
+    ) -> Result<SendTransactionResponse, ApiError> {
         let url = self
             .base_url
             .join("/integrations/registration-relayer/v1/register")
@@ -82,7 +82,7 @@ impl ApiProvider {
         let status = response.status();
 
         if status.is_success() {
-            let result: LiteRegisterResponse = response.json().await?;
+            let result: SendTransactionResponse = response.json().await?;
             return Ok(result);
         }
 
