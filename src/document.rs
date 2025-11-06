@@ -1,15 +1,10 @@
 use crate::hash_algorithm::HashAlgorithm;
-use crate::rarimo_utils::RarimeUtils;
 use crate::signature_algorithm::SignatureAlgorithm;
-use crate::utils::{
-    convert_asn1_to_pem, extract_oid_from_asn1, get_smt_proof_index, poseidon_hash_32_bytes,
-    vec_u8_to_u8_32,
-};
+use crate::utils::{convert_asn1_to_pem, extract_oid_from_asn1, poseidon_hash_32_bytes};
 use crate::{QueryProofParams, RarimeError};
 use chrono::Utc;
-use contracts::ContractCallConfig;
-use contracts::contract::poseidon_smt::PoseidonSmtContract;
-use contracts::contract::state_keeper::StateKeeperContract;
+use contracts::SparseMerkleTree::Proof;
+use contracts::StateKeeper::getPassportInfoReturn;
 use num_bigint::BigInt;
 use num_traits::{One, Zero};
 use proofs::{LiteRegisterProofInput, ProofProvider, QueryProofInput};
@@ -36,27 +31,6 @@ pub struct RarimePassport {
     pub sod: Vec<u8>,
 }
 
-pub(crate) async fn get_document_status(
-    passport_key: &[u8; 32],
-    profile_key: &[u8; 32],
-    config: ContractCallConfig,
-) -> Result<DocumentStatus, RarimeError> {
-    let contacts = StateKeeperContract::new(config);
-    let passport_info = contacts.get_passport_info(passport_key).await?;
-
-    let zero_bytes: [u8; 32] = [0u8; 32];
-
-    let active_identity = passport_info.passportInfo_.activeIdentity;
-
-    if active_identity == zero_bytes {
-        return Ok(DocumentStatus::NotRegistered);
-    }
-    if active_identity == profile_key {
-        return Ok(DocumentStatus::RegisteredWithThisPk);
-    }
-    Ok(DocumentStatus::RegisteredWithOtherPk)
-}
-
 impl RarimePassport {
     pub(crate) fn get_passport_key(&self) -> Result<[u8; 32], RarimeError> {
         if let Some(dg15_bytes) = &self.data_group15 {
@@ -74,6 +48,24 @@ impl RarimePassport {
         let passport_key = self.get_passport_hash()?;
 
         Ok(passport_key)
+    }
+
+    pub async fn get_document_status(
+        &self,
+        profile_key: &[u8; 32],
+        passport_info: getPassportInfoReturn,
+    ) -> Result<DocumentStatus, RarimeError> {
+        let zero_bytes: [u8; 32] = [0u8; 32];
+
+        let active_identity = passport_info.passportInfo_.activeIdentity;
+
+        if active_identity == zero_bytes {
+            return Ok(DocumentStatus::NotRegistered);
+        }
+        if active_identity == profile_key {
+            return Ok(DocumentStatus::RegisteredWithThisPk);
+        }
+        Ok(DocumentStatus::RegisteredWithOtherPk)
     }
 
     pub(crate) fn get_passport_hash(&self) -> Result<[u8; 32], RarimeError> {
@@ -883,31 +875,10 @@ impl RarimePassport {
     pub async fn generate_document_query_proof(
         &self,
         params: QueryProofParams,
-        passport_key: &[u8; 32],
         pk_key: &[u8; 32],
-        state_keeper_config: ContractCallConfig,
-        poseidon_smt_config: ContractCallConfig,
+        smt_proof: Proof,
+        passport_info: getPassportInfoReturn,
     ) -> Result<Vec<u8>, RarimeError> {
-        let state_keeper = StateKeeperContract::new(state_keeper_config);
-        let utils = RarimeUtils::new();
-
-        let profile_key = vec_u8_to_u8_32(&utils.get_profile_key(pk_key.to_vec())?)?;
-
-        let passport_info = state_keeper.get_passport_info(&passport_key).await?;
-
-        if (profile_key != passport_info.passportInfo_.activeIdentity) {
-            return Err(RarimeError::ProfileKeyError(format!(
-                "profile key mismatch. profile_key = {},   passport_info.passportInfo_.activeIdentity= {}",
-                hex::encode(profile_key),
-                hex::encode(passport_info.passportInfo_.activeIdentity)
-            )));
-        }
-
-        let smt_proof_index = get_smt_proof_index(&passport_key, &profile_key)?;
-
-        let poseidon_smt = PoseidonSmtContract::new(poseidon_smt_config);
-        let smt_proof = poseidon_smt.get_proof_call(&smt_proof_index).await?;
-
         let now_time = Utc::now();
 
         let proof_inputs = QueryProofInput {

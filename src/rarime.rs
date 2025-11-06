@@ -1,17 +1,23 @@
-use crate::document::get_document_status;
-use crate::utils::vec_u8_to_u8_32;
+use crate::utils::{get_smt_proof_index, vec_u8_to_u8_32};
 use crate::{DocumentStatus, QueryProofParams, RarimeError, RarimePassport, rarime_utils};
 use api::ApiProvider;
 use api::types::relayer_light_register::{LiteRegisterData, LiteRegisterRequest};
+use api::types::relayer_send_transaction::{
+    SendTransactionAttributes, SendTransactionData, SendTransactionRequest, SendTransactionResponse,
+};
 use api::types::verify_sod::{Attributes, Data, DocumentSod, VerifySodRequest, VerifySodResponse};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use contracts::ContractCallConfig;
 use contracts::call_data_builder::CallDataBuilder;
+use contracts::contract::poseidon_smt::PoseidonSmtContract;
+use contracts::contract::state_keeper::StateKeeperContract;
 use contracts::utils::convert_to_u256;
 
 use crate::rarimo_utils::RarimeUtils;
 use contracts::RegistrationSimple::{Passport, registerSimpleViaNoirCall};
+use contracts::SparseMerkleTree::Proof;
+use contracts::StateKeeper::getPassportInfoReturn;
 use simple_asn1::to_der;
 
 #[derive(Debug, Clone)]
@@ -57,22 +63,15 @@ impl Rarime {
         &self,
         passport: RarimePassport,
     ) -> Result<DocumentStatus, RarimeError> {
-        let state_keeper_config = ContractCallConfig {
-            rpc_url: self.config.api_configuration.json_rpc_evm_url.clone(),
-            contract_address: self
-                .config
-                .contracts_configuration
-                .state_keeper_address
-                .clone(),
-        };
-
         let profile_key = rarime_utils::get_profile_key(&vec_u8_to_u8_32(
             &self.config.user_configuration.user_private_key,
         )?)?;
 
-        let passport_key = passport.get_passport_key()?;
+        let passport_info = self.get_passport_info(&passport).await?;
 
-        let result = get_document_status(&passport_key, &profile_key, state_keeper_config).await?;
+        let result = passport
+            .get_document_status(&profile_key, passport_info)
+            .await?;
 
         Ok(result)
     }
@@ -218,6 +217,65 @@ impl Rarime {
         passport: RarimePassport,
         query_params: QueryProofParams,
     ) -> Result<Vec<u8>, RarimeError> {
+        let passport_info = self.get_passport_info(&passport).await?;
+
+        let pk_u8_32: [u8; 32] = vec_u8_to_u8_32(&self.config.user_configuration.user_private_key)?;
+
+        let smt_proof = self.get_smt_proof(&passport).await?;
+
+        let proof = passport
+            .generate_document_query_proof(query_params, &pk_u8_32, smt_proof, passport_info)
+            .await?;
+
+        return Ok(proof);
+    }
+
+    pub async fn get_passport_info(
+        &self,
+        passport: &RarimePassport,
+    ) -> Result<getPassportInfoReturn, RarimeError> {
+        let state_keeper_config = ContractCallConfig {
+            rpc_url: self.config.api_configuration.json_rpc_evm_url.clone(),
+            contract_address: self
+                .config
+                .contracts_configuration
+                .state_keeper_address
+                .clone(),
+        };
+
+        let passport_key = passport.get_passport_key()?;
+
+        let state_keeper = StateKeeperContract::new(state_keeper_config);
+        let passport_info = state_keeper.get_passport_info(&passport_key).await?;
+
+        return Ok(passport_info);
+    }
+
+    pub async fn send_transaction(
+        &self,
+        call_data: &Vec<u8>,
+        destination: String,
+    ) -> Result<SendTransactionResponse, RarimeError> {
+        let api_provider = ApiProvider::new(&self.config.api_configuration.rarime_api_url)?;
+
+        let send_transaction_request = SendTransactionRequest {
+            data: SendTransactionData {
+                transaction_type: "send_transaction".to_string(),
+                attributes: SendTransactionAttributes {
+                    tx_data: format!("0x{}", hex::encode(call_data)),
+                    destination: destination,
+                },
+            },
+        };
+
+        let send_transaction = api_provider
+            .relayer_send_transaction(&send_transaction_request)
+            .await?;
+
+        return Ok(send_transaction);
+    }
+
+    pub async fn get_smt_proof(&self, passport: &RarimePassport) -> Result<Proof, RarimeError> {
         let state_keeper_config = ContractCallConfig {
             rpc_url: self.config.api_configuration.json_rpc_evm_url.clone(),
             contract_address: self
@@ -236,20 +294,29 @@ impl Rarime {
                 .clone(),
         };
 
+        let pk_key: [u8; 32] = vec_u8_to_u8_32(&self.config.user_configuration.user_private_key)?;
+
         let passport_key = passport.get_passport_key()?;
 
-        let pk_u8_32: [u8; 32] = vec_u8_to_u8_32(&self.config.user_configuration.user_private_key)?;
+        let state_keeper = StateKeeperContract::new(state_keeper_config);
+        let passport_info = state_keeper.get_passport_info(&passport_key).await?;
+        let utils = RarimeUtils::new();
 
-        let proof = passport
-            .generate_document_query_proof(
-                query_params,
-                &passport_key,
-                &pk_u8_32,
-                state_keeper_config,
-                poseidon_smt_config,
-            )
-            .await?;
+        let profile_key = vec_u8_to_u8_32(&utils.get_profile_key(pk_key.to_vec())?)?;
 
-        return Ok(proof);
+        if (profile_key != passport_info.passportInfo_.activeIdentity) {
+            return Err(RarimeError::ProfileKeyError(format!(
+                "profile key mismatch. profile_key = {},   passport_info.passportInfo_.activeIdentity= {}",
+                hex::encode(profile_key),
+                hex::encode(passport_info.passportInfo_.activeIdentity)
+            )));
+        }
+
+        let smt_proof_index = get_smt_proof_index(&passport_key, &profile_key)?;
+
+        let poseidon_smt = PoseidonSmtContract::new(poseidon_smt_config);
+        let smt_proof = poseidon_smt.get_proof_call(&smt_proof_index).await?;
+
+        return Ok(smt_proof);
     }
 }
