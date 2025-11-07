@@ -74,7 +74,7 @@ impl ApiProvider {
     ) -> Result<SendTransactionResponse, ApiError> {
         let url = self
             .base_url
-            .join("/integrations/registration-relayer/v1/register")
+            .join("/integrations/proof-verification-relayer/v2/vote")
             .map_err(ApiError::UrlError)?;
 
         let response = self.client.post(url).json(request).send().await?;
