@@ -319,4 +319,12 @@ impl Rarime {
 
         return Ok(smt_proof);
     }
+
+    pub fn get_private_key(&self) -> Result<[u8; 32], RarimeError> {
+        let private_key = self.config.user_configuration.user_private_key.clone();
+
+        let result = vec_u8_to_u8_32(&private_key)?;
+
+        return Ok(result);
+    }
 }
