@@ -919,4 +919,92 @@ impl RarimePassport {
 
         return Ok(query_proof);
     }
+
+    pub fn get_mrz_string(&self) -> Result<String, RarimeError> {
+        let dg_1 = &self.data_group1;
+
+        let blocks = from_der(dg_1).map_err(|e| RarimeError::ASN1DecodeError(e))?;
+
+        let first = blocks
+            .get(0)
+            .ok_or_else(|| RarimeError::ASN1RouteError("No ASN.1 blocks found".to_string()))?;
+
+        match first {
+            ASN1Block::Explicit(ASN1Class::Application, _, tag1, content_box)
+                if tag1 == &BigUint::from(1u32) =>
+            {
+                match content_box.as_ref() {
+                    ASN1Block::Explicit(ASN1Class::Application, _, tag2, inner_box)
+                        if tag2 == &BigUint::from(31u32) =>
+                    {
+                        match inner_box.as_ref() {
+                            ASN1Block::OctetString(_, data) => {
+                                return Ok(String::from_utf8_lossy(data).into_owned());
+                            }
+                            ASN1Block::PrintableString(_, s) => {
+                                return Ok(s.to_string());
+                            }
+                            ASN1Block::UTF8String(_, s) => {
+                                return Ok(s.to_string());
+                            }
+                            other => {
+                                return Err(RarimeError::ASN1RouteError(format!(
+                                    "Unexpected inner ASN1 type: {:?}",
+                                    other
+                                )));
+                            }
+                        }
+                    }
+
+                    ASN1Block::Unknown(_, _, _, tag2, bytes) if tag2 == &BigUint::from(31u32) => {
+                        if let Ok(inner_blocks) = from_der(bytes) {
+                            if let Some(b0) = inner_blocks.get(0) {
+                                match b0 {
+                                    ASN1Block::OctetString(_, data) => {
+                                        return Ok(String::from_utf8_lossy(data).into_owned());
+                                    }
+                                    ASN1Block::PrintableString(_, s) => {
+                                        return Ok(s.to_string());
+                                    }
+                                    ASN1Block::UTF8String(_, s) => {
+                                        return Ok(s.to_string());
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+
+                        let s = String::from_utf8_lossy(bytes)
+                            .trim_end_matches('\0')
+                            .to_string();
+                        return Ok(s);
+                    }
+
+                    ASN1Block::OctetString(_, data) => {
+                        return Ok(String::from_utf8_lossy(data).into_owned());
+                    }
+                    ASN1Block::PrintableString(_, s) => {
+                        return Ok(s.to_string());
+                    }
+
+                    other => {
+                        return Err(RarimeError::ASN1RouteError(format!(
+                            "Expected Application 31 inside Application 1, got {:?}",
+                            other
+                        )));
+                    }
+                }
+            }
+            _ => {
+                return Err(RarimeError::ASN1RouteError(
+                    "Expected top-level Application 1".to_string(),
+                ));
+            }
+        }
+    }
+
+    pub fn get_citizenship(&self, mrz_string: String) -> Result<String, RarimeError> {
+        let result = mrz_string[2..5].to_string();
+        return Ok(result);
+    }
 }
