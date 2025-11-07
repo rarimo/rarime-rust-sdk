@@ -1,5 +1,5 @@
 use crate::rarime::Rarime;
-use crate::utils::{calculate_event_nullifier, vec_u8_to_u8_32};
+use crate::utils::{big_int_to_32_bytes, calculate_event_nullifier, vec_u8_to_u8_32};
 use crate::{QueryProofParams, RarimeError, RarimePassport, VotingCriteria};
 use api::IPFSApiProvider;
 use api::types::ipfs_voting::IPFSResponseData;
@@ -11,7 +11,8 @@ use contracts::ProposalsState::ProposalInfo;
 use contracts::call_data_builder::{CallDataBuilder, UserData, UserPayloadInputs};
 use contracts::contract::poseidon_smt::PoseidonSmtContract;
 use contracts::contract::proposals_state::ProposalStateContract;
-use contracts::utils::{abi_decode_vote_criteria, u256_from_string};
+use contracts::utils::{abi_decode_vote_criteria, calculate_voting_event_data, u256_from_string};
+use num_bigint::BigInt;
 use num_bigint::BigUint;
 use num_traits::ToBytes;
 use std::str::FromStr;
@@ -156,9 +157,22 @@ impl Freedomtool {
         contract_voting_address: String,
         proposal_id: String,
     ) -> Result<SendTransactionResponse, RarimeError> {
+        let proposal_state_config = ContractCallConfig {
+            contract_address: self
+                .config
+                .contracts_configuration
+                .proposals_state_address
+                .clone(),
+            rpc_url: self.config.api_configuration.voting_rpc_url.clone(),
+        };
+
+        let proposal_state = ProposalStateContract::new(proposal_state_config);
+
+        let event_id = proposal_state.get_event_id(&proposal_id).await?;
+
         let query_proof_params = QueryProofParams {
-            event_id: "".to_string(),   //TODO
-            event_data: "".to_string(), //TODO
+            event_id: event_id.to_string(),
+            event_data: hex::encode(calculate_voting_event_data(&answer)?),
             selector: voting_criteria.selector,
             timestamp_lowerbound: "0".to_string(),
             timestamp_upperbound: voting_criteria.timestamp_upperbound,
@@ -167,7 +181,7 @@ impl Freedomtool {
             birth_date_lowerbound: voting_criteria.birth_date_lowerbound,
             birth_date_upperbound: voting_criteria.birth_date_upperbound,
             expiration_date_lowerbound: voting_criteria.expiration_date_lowerbound,
-            expiration_date_upperbound: "0x303030303030".to_string(),
+            expiration_date_upperbound: "303030303030".to_string(),
             citizenship_mask: "0".to_string(),
         };
 
@@ -178,13 +192,20 @@ impl Freedomtool {
         let call_data_builder = CallDataBuilder {};
 
         let passport_info = rarime.get_passport_info(&passport).await?;
+        let passport_mrz = passport.get_mrz_string()?;
+        let citizenship = passport.get_citizenship(passport_mrz)?;
 
         let user_payload_inputs = UserPayloadInputs {
-            proposal_id: proposal_id,
+            proposal_id: proposal_id.clone(),
             vote: answer.iter().map(|b| b.to_string()).collect(),
             user_data: UserData {
-                nullifier: "".to_string(),   //TODO
-                citizenship: "".to_string(), //TODO
+                nullifier:
+                // "".to_string(),
+                format!(
+                    "0x{}",
+                    hex::encode(calculate_event_nullifier(&big_int_to_32_bytes(&BigInt::from_str(&proposal_id)?), &rarime.get_private_key()?)?)
+                ),
+                citizenship: citizenship,
                 identity_creation_timestamp: passport_info.identityInfo_.issueTimestamp.to_string(),
             },
         };
