@@ -1,6 +1,7 @@
 use crate::ContractsError;
 use alloy::dyn_abi::{DynSolType, DynSolValue};
-use alloy::primitives::{U256, Uint};
+use alloy::primitives::{U256, Uint, keccak256};
+use alloy::sol_types::SolValue;
 use std::str::FromStr;
 
 pub fn convert_to_u256(bytes: &[u8; 32]) -> Result<Uint<256, 4>, ContractsError> {
@@ -159,4 +160,17 @@ pub fn abi_decode_vote_criteria(
 pub fn u256_from_string(input: String) -> Result<U256, ContractsError> {
     let result = U256::from_str(&input)?;
     return Ok(result);
+}
+
+pub fn calculate_voting_event_data(vote: &[u8]) -> Result<[u8; 31], ContractsError> {
+    let tokens: Vec<U256> = vote.iter().map(|&v| U256::from(v)).collect();
+
+    let packed = tokens.abi_encode();
+
+    let hash = keccak256(&packed);
+
+    let mut out = [0u8; 31];
+    out.copy_from_slice(&hash[1..32]);
+
+    return Ok(out);
 }
