@@ -4,12 +4,14 @@ use alloy::primitives::U256;
 use alloy::sol_types::SolCall;
 use std::str::FromStr;
 
+#[derive(Debug, Clone)]
 pub struct UserData {
     pub nullifier: String,
     pub citizenship: String,
     pub identity_creation_timestamp: String,
 }
 
+#[derive(Debug, Clone)]
 pub struct UserPayloadInputs {
     pub proposal_id: String,
     pub vote: Vec<String>,
