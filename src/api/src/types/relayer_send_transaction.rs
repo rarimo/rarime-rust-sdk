@@ -8,7 +8,7 @@ pub struct SendTransactionRequest {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SendTransactionData {
     #[serde(rename = "type")]
-    pub transaction_type: String,
+    pub data_type: String,
     pub attributes: SendTransactionAttributes,
 }
 

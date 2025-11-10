@@ -2,9 +2,6 @@ use crate::utils::{get_smt_proof_index, vec_u8_to_u8_32};
 use crate::{DocumentStatus, QueryProofParams, RarimeError, RarimePassport, rarime_utils};
 use api::ApiProvider;
 use api::types::relayer_light_register::{LiteRegisterData, LiteRegisterRequest};
-use api::types::relayer_send_transaction::{
-    SendTransactionAttributes, SendTransactionData, SendTransactionRequest, SendTransactionResponse,
-};
 use api::types::verify_sod::{Attributes, Data, DocumentSod, VerifySodRequest, VerifySodResponse};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
@@ -249,30 +246,6 @@ impl Rarime {
         let passport_info = state_keeper.get_passport_info(&passport_key).await?;
 
         return Ok(passport_info);
-    }
-
-    pub async fn send_transaction(
-        &self,
-        call_data: &Vec<u8>,
-        destination: String,
-    ) -> Result<SendTransactionResponse, RarimeError> {
-        let api_provider = ApiProvider::new(&self.config.api_configuration.rarime_api_url)?;
-
-        let send_transaction_request = SendTransactionRequest {
-            data: SendTransactionData {
-                transaction_type: "send_transaction".to_string(),
-                attributes: SendTransactionAttributes {
-                    tx_data: format!("0x{}", hex::encode(call_data)),
-                    destination: destination,
-                },
-            },
-        };
-
-        let send_transaction = api_provider
-            .relayer_send_transaction(&send_transaction_request)
-            .await?;
-
-        return Ok(send_transaction);
     }
 
     pub async fn get_smt_proof(&self, passport: &RarimePassport) -> Result<Proof, RarimeError> {
