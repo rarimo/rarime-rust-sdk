@@ -1,9 +1,11 @@
 use crate::rarime::Rarime;
 use crate::utils::{big_int_to_32_bytes, calculate_event_nullifier, vec_u8_to_u8_32};
 use crate::{QueryProofParams, RarimeError, RarimePassport, VotingCriteria};
-use api::IPFSApiProvider;
 use api::types::ipfs_voting::IPFSResponseData;
-use api::types::relayer_send_transaction::SendTransactionResponse;
+use api::types::relayer_send_transaction::{
+    SendTransactionAttributes, SendTransactionData, SendTransactionRequest, SendTransactionResponse,
+};
+use api::{ApiProvider, IPFSApiProvider};
 use chrono::Utc;
 use contracts::ContractCallConfig;
 use contracts::IdCardVoting::executeTD1NoirCall;
@@ -27,6 +29,7 @@ pub struct FreedomtoolConfiguration {
 pub struct FreedomtoolAPIConfiguration {
     pub voting_rpc_url: String,
     pub ipfs_url: String,
+    pub relayer_url: String,
 }
 
 #[derive(Debug, Clone)]
@@ -169,7 +172,7 @@ impl Freedomtool {
         let proposal_state = ProposalStateContract::new(proposal_state_config);
 
         let event_id = proposal_state.get_event_id(&proposal_id).await?;
-
+        dbg!(&event_id);
         let query_proof_params = QueryProofParams {
             event_id: event_id.to_string(),
             event_data: hex::encode(calculate_voting_event_data(&answer)?),
@@ -184,17 +187,16 @@ impl Freedomtool {
             expiration_date_upperbound: "303030303030".to_string(),
             citizenship_mask: "0".to_string(),
         };
-
+        dbg!(&query_proof_params);
         let query_proof = rarime
             .generate_query_proof(passport.clone(), query_proof_params)
             .await?;
-
         let call_data_builder = CallDataBuilder {};
 
         let passport_info = rarime.get_passport_info(&passport).await?;
         let passport_mrz = passport.get_mrz_string()?;
         let citizenship = passport.get_citizenship(passport_mrz)?;
-
+        dbg!(&passport_info);
         let user_payload_inputs = UserPayloadInputs {
             proposal_id: proposal_id.clone(),
             vote: answer.iter().map(|b| b.to_string()).collect(),
@@ -205,13 +207,13 @@ impl Freedomtool {
                     "0x{}",
                     hex::encode(calculate_event_nullifier(&big_int_to_32_bytes(&BigInt::from_str(&proposal_id)?), &rarime.get_private_key()?)?)
                 ),
-                citizenship: citizenship,
+                citizenship: u32::from_str_radix(&citizenship.as_bytes().iter().map(|b| format!("{:02X}", b)).collect::<String>(), 16).unwrap().to_string(),
                 identity_creation_timestamp: passport_info.identityInfo_.issueTimestamp.to_string(),
             },
         };
-
+        dbg!(&user_payload_inputs);
         let user_payload = call_data_builder.encode_user_payload(user_payload_inputs)?;
-
+        dbg!(hex::encode(&user_payload));
         let smt_proof = rarime.get_smt_proof(&passport).await?;
 
         let now_time = Utc::now().format("%y%m%d").to_string();
@@ -221,15 +223,41 @@ impl Freedomtool {
             registrationRoot_: smt_proof.root,
             currentDate_: u256_from_string(current_date_big_int.to_string())?,
             userPayload_: user_payload.into(),
-            zkPoints_: query_proof.into(),
+            zkPoints_: query_proof[736..].to_vec().into(), //cut pub signals
         };
 
         let call_data = call_data_builder.build_noir_vote_call_data(inputs)?;
+        dbg!(hex::encode(&call_data));
 
-        let result = rarime
+        let result = self
             .send_transaction(&call_data, contract_voting_address)
             .await?;
 
         return Ok(result);
+    }
+
+    pub async fn send_transaction(
+        &self,
+        call_data: &Vec<u8>,
+        destination: String,
+    ) -> Result<SendTransactionResponse, RarimeError> {
+        let api_provider = ApiProvider::new(&self.config.api_configuration.relayer_url)?;
+
+        let send_transaction_request = SendTransactionRequest {
+            data: SendTransactionData {
+                data_type: "send_transaction".to_string(),
+                attributes: SendTransactionAttributes {
+                    tx_data: format!("0x{}", hex::encode(call_data)),
+                    destination: destination,
+                },
+            },
+        };
+        dbg!(&send_transaction_request);
+
+        let send_transaction = api_provider
+            .relayer_send_vote_transaction(&send_transaction_request)
+            .await?;
+
+        return Ok(send_transaction);
     }
 }
