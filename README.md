@@ -101,6 +101,7 @@ We support two chains:
 | `API_URL`            | `https://api.app.rarime.com`  | `https://api.orgs.app.stage.rarime.com` |
 | `IPFS_URL`           | `https://ipfs.rarimo.com `    | `https://ipfs.rarimo.com `              |
 | `VOTING_RELAYER_URL` | `https://api.freedomtool.org` | `https://api.stage.freedomtool.org`     |
+| `FREEDOMTOOL_URL`    | `https://freedomtool.org`     | `https://stage.voting.freedomtool.org/` |
 
 ---
 
