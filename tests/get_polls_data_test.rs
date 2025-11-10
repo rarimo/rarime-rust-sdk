@@ -14,12 +14,13 @@ mod tests {
             api_configuration: FreedomtoolAPIConfiguration {
                 voting_rpc_url: "https://rpc.qtestnet.org".to_string(),
                 ipfs_url: "https://ipfs.rarimo.com".to_string(),
+                relayer_url: "".to_string(),
             },
         };
 
         let freedomtool = Freedomtool::new(freedomtool_config);
 
-        let proposal_id: String = "208".to_string();
+        let proposal_id: String = "210".to_string();
 
         let proposal_data_contract = freedomtool
             .get_polls_data_contract(proposal_id)
