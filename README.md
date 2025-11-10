@@ -95,11 +95,12 @@ We support two chains:
 
 ## API Addresses
 
-| Name           | MainNet Address              | TestNet Address                         |
-|----------------|------------------------------|-----------------------------------------|
-| `JSON_RPC_URL` | `https://l2.rarimo.com`      | `https://rpc.evm.mainnet.rarimo.com`    |
-| `API_URL`      | `https://api.app.rarime.com` | `https://api.orgs.app.stage.rarime.com` |
-| `IPFS_URL`     | `https://ipfs.rarimo.com `   | `https://ipfs.rarimo.com `              |
+| Name                 | MainNet Address               | TestNet Address                         |
+|----------------------|-------------------------------|-----------------------------------------|
+| `JSON_RPC_URL`       | `https://l2.rarimo.com`       | `https://rpc.evm.mainnet.rarimo.com`    |
+| `API_URL`            | `https://api.app.rarime.com`  | `https://api.orgs.app.stage.rarime.com` |
+| `IPFS_URL`           | `https://ipfs.rarimo.com `    | `https://ipfs.rarimo.com `              |
+| `VOTING_RELAYER_URL` | `https://api.freedomtool.org` | `https://api.stage.freedomtool.org`     |
 
 ---
 
