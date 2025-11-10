@@ -68,7 +68,7 @@ impl ApiProvider {
         Err(ApiError::HttpError { body: error_body })
     }
 
-    pub async fn relayer_send_transaction(
+    pub async fn relayer_send_vote_transaction(
         &self,
         request: &SendTransactionRequest,
     ) -> Result<SendTransactionResponse, ApiError> {
@@ -76,7 +76,6 @@ impl ApiProvider {
             .base_url
             .join("/integrations/proof-verification-relayer/v2/vote")
             .map_err(ApiError::UrlError)?;
-
         let response = self.client.post(url).json(request).send().await?;
 
         let status = response.status();

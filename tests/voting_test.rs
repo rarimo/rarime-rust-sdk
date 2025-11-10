@@ -15,7 +15,7 @@ mod tests {
     use std::fs;
 
     #[tokio::test]
-    async fn get_polls_data_test_ipfs() {
+    async fn send_vote_test() {
         let freedomtool_config = FreedomtoolConfiguration {
             contracts_configuration: FreedomtoolContractsConfiguration {
                 proposals_state_address: "0x4C61d7454653720DAb9e26Ca25dc7B8a5cf7065b".to_string(),
@@ -23,12 +23,13 @@ mod tests {
             api_configuration: FreedomtoolAPIConfiguration {
                 voting_rpc_url: "https://rpc.qtestnet.org".to_string(),
                 ipfs_url: "https://ipfs.rarimo.com".to_string(),
+                relayer_url: "https://api.stage.freedomtool.org".to_string(),
             },
         };
 
         let freedomtool = Freedomtool::new(freedomtool_config);
 
-        let proposal_id: String = "208".to_string();
+        let proposal_id: String = "209".to_string();
 
         let proposal_data_contract = freedomtool
             .get_polls_data_contract(proposal_id.clone())
