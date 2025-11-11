@@ -16,7 +16,7 @@ use contracts::contract::proposals_state::ProposalStateContract;
 use contracts::utils::{abi_decode_vote_criteria, calculate_voting_event_data, u256_from_string};
 use num_bigint::BigInt;
 use num_bigint::BigUint;
-use num_traits::ToBytes;
+use num_traits::{Num, ToBytes};
 use std::str::FromStr;
 
 #[derive(Debug, Clone)]
@@ -191,29 +191,33 @@ impl Freedomtool {
         let query_proof = rarime
             .generate_query_proof(passport.clone(), query_proof_params)
             .await?;
+
+        dbg!(&query_proof.len());
         let call_data_builder = CallDataBuilder {};
 
         let passport_info = rarime.get_passport_info(&passport).await?;
         let passport_mrz = passport.get_mrz_string()?;
         let citizenship = passport.get_citizenship(passport_mrz)?;
         dbg!(&passport_info);
+        let event_nullifier = calculate_event_nullifier(
+            &big_int_to_32_bytes(&BigInt::from_str(&event_id.to_string())?),
+            &rarime.get_private_key()?,
+        )?;
+
         let user_payload_inputs = UserPayloadInputs {
             proposal_id: proposal_id.clone(),
             vote: answer.iter().map(|b| b.to_string()).collect(),
             user_data: UserData {
                 nullifier:
-                // "".to_string(),
-                format!(
-                    "0x{}",
-                    hex::encode(calculate_event_nullifier(&big_int_to_32_bytes(&BigInt::from_str(&proposal_id)?), &rarime.get_private_key()?)?)
-                ),
-                citizenship: u32::from_str_radix(&citizenship.as_bytes().iter().map(|b| format!("{:02X}", b)).collect::<String>(), 16).unwrap().to_string(),
+                //"0".to_string(),
+                BigUint::from_bytes_be(&event_nullifier).to_string(),
+                citizenship: BigUint::from_str_radix(&citizenship.as_bytes().iter().map(|b| format!("{:02X}", b)).collect::<String>(), 16)?.to_string(),
                 identity_creation_timestamp: passport_info.identityInfo_.issueTimestamp.to_string(),
             },
         };
         dbg!(&user_payload_inputs);
         let user_payload = call_data_builder.encode_user_payload(user_payload_inputs)?;
-        dbg!(hex::encode(&user_payload));
+        dbg!(hex::encode(&user_payload).len());
         let smt_proof = rarime.get_smt_proof(&passport).await?;
 
         let now_time = Utc::now().format("%y%m%d").to_string();
@@ -225,9 +229,9 @@ impl Freedomtool {
             userPayload_: user_payload.into(),
             zkPoints_: query_proof[736..].to_vec().into(), //cut pub signals
         };
-
+        dbg!(&inputs);
         let call_data = call_data_builder.build_noir_vote_call_data(inputs)?;
-        dbg!(hex::encode(&call_data));
+        dbg!(&call_data.len());
 
         let result = self
             .send_transaction(&call_data, contract_voting_address)
