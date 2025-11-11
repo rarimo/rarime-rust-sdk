@@ -277,7 +277,7 @@ impl Rarime {
 
         let profile_key = vec_u8_to_u8_32(&utils.get_profile_key(pk_key.to_vec())?)?;
 
-        if (profile_key != passport_info.passportInfo_.activeIdentity) {
+        if profile_key != passport_info.passportInfo_.activeIdentity {
             return Err(RarimeError::ProfileKeyError(format!(
                 "profile key mismatch. profile_key = {},   passport_info.passportInfo_.activeIdentity= {}",
                 hex::encode(profile_key),

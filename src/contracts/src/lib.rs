@@ -4,8 +4,6 @@ pub mod utils;
 
 pub mod call_data_builder;
 
-use crate::ProposalsState::ProposalInfo;
-use crate::SparseMerkleTree::Proof;
 use crate::errors::ContractsError;
 use alloy::sol;
 
