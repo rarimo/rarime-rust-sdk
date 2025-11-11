@@ -23,7 +23,7 @@ mod tests {
             api_configuration: FreedomtoolAPIConfiguration {
                 voting_rpc_url: "https://rpc.qtestnet.org".to_string(),
                 ipfs_url: "https://ipfs.rarimo.com".to_string(),
-                relayer_url: "https://api.stage.freedomtool.org".to_string(),
+                relayer_url: "http://127.0.0.1:8000".to_string(),
             },
         };
 
