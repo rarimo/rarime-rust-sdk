@@ -40,25 +40,17 @@ impl CallDataBuilder {
                     })
                     .collect::<Result<Vec<_>, ContractsError>>()?,
             ),
-            DynSolValue::CustomStruct {
-                name: "user_data".to_string(),
-                prop_names: vec![
-                    "nullifier".to_string(),
-                    "citizenship".to_string(),
-                    "identityCreationTimestamp".to_string(),
-                ],
-                tuple: vec![
-                    DynSolValue::Uint(U256::from_str(inputs.user_data.nullifier.as_str())?, 256),
-                    DynSolValue::Uint(U256::from_str(inputs.user_data.citizenship.as_str())?, 256),
-                    DynSolValue::Uint(
-                        U256::from_str(inputs.user_data.identity_creation_timestamp.as_str())?,
-                        256,
-                    ),
-                ],
-            },
+            DynSolValue::Tuple(vec![
+                DynSolValue::Uint(U256::from_str(inputs.user_data.nullifier.as_str())?, 256),
+                DynSolValue::Uint(U256::from_str(inputs.user_data.citizenship.as_str())?, 256),
+                DynSolValue::Uint(
+                    U256::from_str(inputs.user_data.identity_creation_timestamp.as_str())?,
+                    256,
+                ),
+            ]),
         ]);
 
-        let encoded: Vec<u8> = user_payload_value.abi_encode();
+        let encoded: Vec<u8> = user_payload_value.abi_encode_params();
 
         return Ok(encoded);
     }
