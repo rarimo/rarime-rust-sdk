@@ -29,7 +29,7 @@ mod tests {
 
         let freedomtool = Freedomtool::new(freedomtool_config);
 
-        let proposal_id: String = "209".to_string();
+        let proposal_id: String = "212".to_string();
 
         let proposal_data_contract = freedomtool
             .get_polls_data_contract(proposal_id.clone())
@@ -44,9 +44,11 @@ mod tests {
         let answers = vec![1];
 
         let proposal_criteria = freedomtool
-            .abi_decode_proposal_criteria(hex::encode(
-                proposal_data_contract.config.votingWhitelistData[0].clone(),
-            ))
+            .get_proposal_rules(
+                proposal_id.clone(),
+                proposal_data_contract.config.votingWhitelist[0].to_string(),
+            )
+            .await
             .unwrap();
 
         let rarime_config = RarimeConfiguration {

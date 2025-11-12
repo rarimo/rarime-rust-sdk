@@ -13,7 +13,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_light_registration() {
-        let json_string = fs::read_to_string("./tests/assets/passports/id_card3.json").unwrap();
+        let json_string = fs::read_to_string("./tests/assets/passports/id_card1.json").unwrap();
         let json_value: Value = serde_json::from_str(&json_string).unwrap();
 
         let rarime_config = RarimeConfiguration {

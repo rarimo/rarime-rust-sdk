@@ -14,17 +14,29 @@ mod tests {
             api_configuration: FreedomtoolAPIConfiguration {
                 voting_rpc_url: "https://rpc.qtestnet.org".to_string(),
                 ipfs_url: "https://ipfs.rarimo.com".to_string(),
-                relayer_url: "".to_string(),
+                relayer_url: "http://127.0.0.1:8000".to_string(),
             },
         };
 
         let freedomtool = Freedomtool::new(freedomtool_config);
 
-        let hex_string = "0x00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000001a2100000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000069112b000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003030303030300000000000000000000000000000000000000000000000000000303030303030000000000000000000000000000000000000000000000000000032353131313000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000554b52".to_string();
+        let proposal_id = "209".to_string();
+
+        let proposal_data_contract = freedomtool
+            .get_polls_data_contract(proposal_id.clone())
+            .await
+            .unwrap();
+
+        dbg!(&proposal_data_contract);
+
+        let voting_address = proposal_data_contract.config.votingWhitelist[0].to_string();
+        dbg!(&voting_address);
 
         let proposal_criteria = freedomtool
-            .abi_decode_proposal_criteria(hex_string)
+            .get_proposal_rules(proposal_id, voting_address)
+            .await
             .unwrap();
+
         dbg!(&proposal_criteria);
     }
 }

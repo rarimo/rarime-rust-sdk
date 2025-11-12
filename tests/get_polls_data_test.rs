@@ -20,7 +20,7 @@ mod tests {
 
         let freedomtool = Freedomtool::new(freedomtool_config);
 
-        let proposal_id: String = "210".to_string();
+        let proposal_id: String = "209".to_string();
 
         let proposal_data_contract = freedomtool
             .get_polls_data_contract(proposal_id)
