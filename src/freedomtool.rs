@@ -11,12 +11,13 @@ use contracts::ContractCallConfig;
 use contracts::IdCardVoting::executeTD1NoirCall;
 use contracts::ProposalsState::ProposalInfo;
 use contracts::call_data_builder::{CallDataBuilder, UserData, UserPayloadInputs};
+use contracts::contract::id_card_voting::IdCardVotingContract;
 use contracts::contract::poseidon_smt::PoseidonSmtContract;
 use contracts::contract::proposals_state::ProposalStateContract;
-use contracts::utils::{abi_decode_vote_criteria, calculate_voting_event_data, u256_from_string};
+use contracts::utils::{calculate_voting_event_data, u256_from_string};
 use num_bigint::BigInt;
 use num_bigint::BigUint;
-use num_traits::{Num, ToBytes};
+use num_traits::Num;
 use std::str::FromStr;
 
 #[derive(Debug, Clone)]
@@ -81,16 +82,16 @@ impl Freedomtool {
 
     pub async fn is_already_voted(
         &self,
-        proposal_smt_address: String,
         private_key: Vec<u8>,
         event_id: &[u8; 32],
+        proposal_smt_address: String,
     ) -> Result<bool, RarimeError> {
-        let poseidon_smt_call_config = ContractCallConfig {
+        let proposal_smt_call_config = ContractCallConfig {
             rpc_url: self.config.api_configuration.voting_rpc_url.clone(),
             contract_address: proposal_smt_address,
         };
 
-        let poseidon_smt = PoseidonSmtContract::new(poseidon_smt_call_config);
+        let poseidon_smt = PoseidonSmtContract::new(proposal_smt_call_config);
 
         let private_key_u8_32 = vec_u8_to_u8_32(&private_key)?;
 
@@ -100,52 +101,38 @@ impl Freedomtool {
         return Ok(smt_proof.existence);
     }
 
-    pub fn abi_decode_proposal_criteria(
+    pub async fn get_proposal_rules(
         &self,
-        voting_whitelist_data: String,
+        proposal_id: String,
+        id_card_voting_address: String,
     ) -> Result<VotingCriteria, RarimeError> {
-        let voting_data_without_prefix =
-            if let Some(stripped) = voting_whitelist_data.strip_prefix("0x") {
-                stripped
-            } else {
-                &voting_whitelist_data
-            };
-        let data = hex::decode(voting_data_without_prefix)?;
+        let id_card_voting_config = ContractCallConfig {
+            rpc_url: self.config.api_configuration.voting_rpc_url.clone(),
+            contract_address: id_card_voting_address,
+        };
+        dbg!(&id_card_voting_config);
 
-        let decoded_poll_criteria = abi_decode_vote_criteria(&data)?;
+        let id_card_voting = IdCardVotingContract::new(id_card_voting_config);
+        dbg!(&id_card_voting);
 
-        let selector: String = decoded_poll_criteria.0;
-        let citizenship_whitelist: Vec<String> = decoded_poll_criteria.1;
-        let timestamp_upperbound: String = decoded_poll_criteria.2;
-        let identity_count_upperbound: String = decoded_poll_criteria.3;
-        let sex: String = decoded_poll_criteria.4;
-
-        let birth_date_lowerbound_big_int = BigUint::from_str(&decoded_poll_criteria.5)?;
-        let birth_date_upperbound_big_int = BigUint::from_str(&decoded_poll_criteria.6)?;
-        let expiration_date_lowerbound_big_int = BigUint::from_str(&decoded_poll_criteria.7)?;
-
-        let birth_date_lowerbound = format!(
-            "0x{}",
-            hex::encode(birth_date_lowerbound_big_int.to_be_bytes())
-        );
-        let birth_date_upperbound = format!(
-            "0x{}",
-            hex::encode(birth_date_upperbound_big_int.to_be_bytes())
-        );
-        let expiration_date_lowerbound = format!(
-            "0x{}",
-            hex::encode(expiration_date_lowerbound_big_int.to_be_bytes())
-        );
+        let proposal_rules = id_card_voting.get_proposal_rules(proposal_id).await?;
+        dbg!(&proposal_rules);
 
         let result = VotingCriteria {
-            selector,
-            citizenship_whitelist,
-            timestamp_upperbound,
-            identity_count_upperbound,
-            sex,
-            birth_date_lowerbound,
-            birth_date_upperbound,
-            expiration_date_lowerbound,
+            selector: proposal_rules.selector.to_string(),
+            citizenship_whitelist: proposal_rules
+                .citizenshipWhitelist
+                .iter()
+                .map(|x| x.to_string())
+                .collect(),
+            timestamp_upperbound: proposal_rules
+                .identityCreationTimestampUpperBound
+                .to_string(),
+            identity_count_upperbound: proposal_rules.identityCounterUpperBound.to_string(),
+            sex: proposal_rules.sex.to_string(),
+            birth_date_lowerbound: proposal_rules.birthDateLowerbound.to_string(),
+            birth_date_upperbound: proposal_rules.birthDateUpperbound.to_string(),
+            expiration_date_lowerbound: proposal_rules.expirationDateLowerBound.to_string(),
         };
 
         return Ok(result);
@@ -153,7 +140,7 @@ impl Freedomtool {
 
     pub async fn send_vote(
         &self,
-        answer: Vec<u8>,
+        answers: Vec<u8>,
         voting_criteria: VotingCriteria,
         rarime: Rarime,
         passport: RarimePassport,
@@ -175,7 +162,8 @@ impl Freedomtool {
         dbg!(&event_id);
         let query_proof_params = QueryProofParams {
             event_id: event_id.to_string(),
-            event_data: hex::encode(calculate_voting_event_data(&answer)?),
+            event_data: BigUint::from_bytes_be(&calculate_voting_event_data(&answers)?.to_vec())
+                .to_string(),
             selector: voting_criteria.selector,
             timestamp_lowerbound: "0".to_string(),
             timestamp_upperbound: voting_criteria.timestamp_upperbound,
@@ -184,7 +172,7 @@ impl Freedomtool {
             birth_date_lowerbound: voting_criteria.birth_date_lowerbound,
             birth_date_upperbound: voting_criteria.birth_date_upperbound,
             expiration_date_lowerbound: voting_criteria.expiration_date_lowerbound,
-            expiration_date_upperbound: "303030303030".to_string(),
+            expiration_date_upperbound: "52983525027888".to_string(),
             citizenship_mask: "0".to_string(),
         };
         dbg!(&query_proof_params);
@@ -206,12 +194,18 @@ impl Freedomtool {
 
         let user_payload_inputs = UserPayloadInputs {
             proposal_id: proposal_id.clone(),
-            vote: answer.iter().map(|b| b.to_string()).collect(),
+            vote: answers.iter().map(|b| b.to_string()).collect(),
             user_data: UserData {
-                nullifier:
-                //"0".to_string(),
-                BigUint::from_bytes_be(&event_nullifier).to_string(),
-                citizenship: BigUint::from_str_radix(&citizenship.as_bytes().iter().map(|b| format!("{:02X}", b)).collect::<String>(), 16)?.to_string(),
+                nullifier: BigUint::from_bytes_be(&event_nullifier).to_string(),
+                citizenship: BigUint::from_str_radix(
+                    &citizenship
+                        .as_bytes()
+                        .iter()
+                        .map(|b| format!("{:02X}", b))
+                        .collect::<String>(),
+                    16,
+                )?
+                .to_string(),
                 identity_creation_timestamp: passport_info.identityInfo_.issueTimestamp.to_string(),
             },
         };
@@ -227,7 +221,7 @@ impl Freedomtool {
             registrationRoot_: smt_proof.root,
             currentDate_: u256_from_string(current_date_big_int.to_string())?,
             userPayload_: user_payload.into(),
-            zkPoints_: query_proof[736..].to_vec().into(), //cut pub signals
+            zkPoints_: query_proof.into(), //cut pub signals
         };
         dbg!(&inputs);
         let call_data = call_data_builder.build_noir_vote_call_data(inputs)?;
