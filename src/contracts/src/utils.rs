@@ -163,7 +163,11 @@ pub fn u256_from_string(input: String) -> Result<U256, ContractsError> {
 }
 
 pub fn calculate_voting_event_data(vote: &[u8]) -> Result<[u8; 31], ContractsError> {
-    let tokens: Vec<U256> = vote.iter().map(|&v| U256::from(v)).collect();
+    let tokens: Vec<U256> = vote
+        .iter()
+        .enumerate()
+        .map(|(i, &v)| U256::from(v) << i)
+        .collect();
 
     let packed = tokens.abi_encode();
 
@@ -171,6 +175,5 @@ pub fn calculate_voting_event_data(vote: &[u8]) -> Result<[u8; 31], ContractsErr
 
     let mut out = [0u8; 31];
     out.copy_from_slice(&hash[1..32]);
-
-    return Ok(out);
+    Ok(out)
 }

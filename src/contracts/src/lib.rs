@@ -42,6 +42,7 @@ sol!(
     "src/abi/PoseidonSMT.json"
 );
 
+#[derive(Debug, Clone)]
 pub struct ContractCallConfig {
     pub rpc_url: String,
     pub contract_address: String,
