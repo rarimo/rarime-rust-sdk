@@ -6,9 +6,10 @@ use chrono::Utc;
 use contracts::SparseMerkleTree::Proof;
 use contracts::StateKeeper::getPassportInfoReturn;
 use num_bigint::BigInt;
-use num_traits::{One, Zero};
+use num_traits::{Num, One, Zero};
 use proofs::{LiteRegisterProofInput, ProofProvider, QueryProofInput};
 use simple_asn1::{ASN1Block, ASN1Class, BigUint, from_der, to_der};
+use std::vec;
 
 enum ActiveAuthKey {
     Rsa { modulus: BigInt, exponent: BigInt },
@@ -883,13 +884,14 @@ impl RarimePassport {
 
         let proof_inputs = QueryProofInput {
             event_id: params.event_id, //from input
-            event_data: BigUint::from_bytes_be(&hex::decode(
-                params.event_data.chars().skip(2).collect::<String>(),
-            )?)
-            .to_str_radix(10),
+            event_data: params.event_data,
             id_state_root: BigUint::from_bytes_be(smt_proof.root.as_slice()).to_str_radix(10), //from SMT
             selector: params.selector, //from input
-            current_date: format!("0x{}", hex::encode(now_time.format("%y%m%d").to_string())),
+            current_date: BigUint::from_str_radix(
+                &hex::encode(now_time.format("%y%m%d").to_string()),
+                16,
+            )?
+            .to_string(),
             timestamp_lowerbound: params.timestamp_lowerbound, //from input
             timestamp_upperbound: params.timestamp_upperbound, //from input
             identity_count_lowerbound: params.identity_count_lowerbound, //from input
@@ -900,7 +902,7 @@ impl RarimePassport {
             expiration_date_upperbound: params.expiration_date_upperbound, //from input
             citizenship_mask: params.citizenship_mask,         //from input
             sk_identity: BigUint::from_bytes_be(pk_key).to_str_radix(10),
-            pk_passport_hash: BigUint::from_bytes_be(&self.get_passport_key()?).to_str_radix(10),
+            pk_passport_hash: BigUint::from_bytes_be(&self.get_passport_key()?).to_string(),
             dg1: self.data_group1.clone(),
             siblings: smt_proof
                 .siblings
@@ -913,6 +915,8 @@ impl RarimePassport {
                 .identityReissueCounter
                 .to_string(),
         };
+
+        dbg!(&proof_inputs);
 
         let proof_provider = ProofProvider::new();
         let query_proof = proof_provider.generate_query_proof(proof_inputs)?;
