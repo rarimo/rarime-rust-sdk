@@ -27,7 +27,7 @@ mod tests {
             },
             user_configuration: RarimeUserConfiguration {
                 user_private_key: hex::decode(
-                    "0e70631f7f1a4bdadec45a79e0577d29dbe2723c0b0016faea064c1679bb9de0",
+                    "090ad31e17fa6d91dd575249db8e721262f988eac3bfe9b4d5366415a7995865",
                 )
                 .unwrap(),
             },
@@ -39,7 +39,9 @@ mod tests {
             data_group1: STANDARD
                 .decode(json_value.get("dg1").unwrap().as_str().unwrap())
                 .unwrap(),
-            data_group15: Some(
+            data_group15:
+            // None,
+            Some(
                 STANDARD
                     .decode(json_value.get("dg15").unwrap().as_str().unwrap())
                     .unwrap(),
@@ -53,18 +55,19 @@ mod tests {
 
         let query_params = QueryProofParams {
             event_id: "43580365239758335475".to_string(),
-            event_data: "0x98d622d3d4ede97469fb2152b1c9d4e4470b354db2c07afaa3846ca0d885af"
-                .to_string(),
+            event_data:
+                "270038666511201875208172000617689023489105079510191335498520083214634616239"
+                    .to_string(),
             selector: "0".to_string(),
             timestamp_lowerbound: "0".to_string(),
             timestamp_upperbound: "0".to_string(),
             identity_count_lowerbound: "0".to_string(),
             identity_count_upperbound: "0".to_string(),
-            birth_date_lowerbound: "0x303030303030".to_string(),
-            birth_date_upperbound: "0x303030303030".to_string(),
-            expiration_date_lowerbound: "0x303030303030".to_string(),
-            expiration_date_upperbound: "0x303030303030".to_string(),
-            citizenship_mask: "0x00".to_string(),
+            birth_date_lowerbound: "52983525027888".to_string(),
+            birth_date_upperbound: "52983525027888".to_string(),
+            expiration_date_lowerbound: "52983525027888".to_string(),
+            expiration_date_upperbound: "52983525027888".to_string(),
+            citizenship_mask: "0".to_string(),
         };
 
         let result = tokio::task::spawn_blocking({
@@ -76,6 +79,11 @@ mod tests {
         .await
         .unwrap()
         .unwrap();
+
+        for (i, chunk) in result.chunks(32).take(24).enumerate() {
+            dbg!(format!("0x{}", hex::encode(chunk)));
+        }
+        dbg!(hex::encode(result[768..].to_vec()));
 
         dbg!(hex::encode(&result));
     }
