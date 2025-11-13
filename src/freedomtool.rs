@@ -17,7 +17,6 @@ use contracts::contract::proposals_state::ProposalStateContract;
 use contracts::utils::{calculate_voting_event_data, u256_from_string};
 use num_bigint::BigInt;
 use num_bigint::BigUint;
-use num_traits::Num;
 use std::str::FromStr;
 
 #[derive(Debug, Clone)]
@@ -147,6 +146,8 @@ impl Freedomtool {
         contract_voting_address: String,
         proposal_id: String,
     ) -> Result<SendTransactionResponse, RarimeError> {
+        const ROOT_VALIDITY: u32 = 3600u32;
+
         let proposal_state_config = ContractCallConfig {
             contract_address: self
                 .config
@@ -160,13 +161,22 @@ impl Freedomtool {
 
         let event_id = proposal_state.get_event_id(&proposal_id).await?;
         dbg!(&event_id);
+
+        let passport_info = rarime.get_passport_info(&passport).await?;
+
+        let timestamp_upperbound = if passport_info.identityInfo_.issueTimestamp > 0 {
+            BigUint::from(passport_info.identityInfo_.issueTimestamp)
+        } else {
+            BigUint::from_str(&voting_criteria.timestamp_upperbound)? - BigUint::from(ROOT_VALIDITY)
+        };
+
         let query_proof_params = QueryProofParams {
             event_id: event_id.to_string(),
             event_data: BigUint::from_bytes_be(&calculate_voting_event_data(&answers)?.to_vec())
                 .to_string(),
             selector: voting_criteria.selector,
             timestamp_lowerbound: "0".to_string(),
-            timestamp_upperbound: voting_criteria.timestamp_upperbound,
+            timestamp_upperbound: timestamp_upperbound.to_string(),
             identity_count_lowerbound: "0".to_string(),
             identity_count_upperbound: voting_criteria.identity_count_upperbound,
             birth_date_lowerbound: voting_criteria.birth_date_lowerbound,
@@ -180,12 +190,14 @@ impl Freedomtool {
             .generate_query_proof(passport.clone(), query_proof_params)
             .await?;
 
-        dbg!(&query_proof.len());
+        for (i, chunk) in query_proof.chunks(32).take(24).enumerate() {
+            dbg!(format!("0x{}", hex::encode(chunk)));
+        }
+        dbg!(hex::encode(query_proof[768..].to_vec()));
+
         let call_data_builder = CallDataBuilder {};
 
         let passport_info = rarime.get_passport_info(&passport).await?;
-        let passport_mrz = passport.get_mrz_string()?;
-        let citizenship = passport.get_citizenship(passport_mrz)?;
         dbg!(&passport_info);
         let event_nullifier = calculate_event_nullifier(
             &big_int_to_32_bytes(&BigInt::from_str(&event_id.to_string())?),
@@ -197,15 +209,7 @@ impl Freedomtool {
             vote: answers.iter().map(|b| b.to_string()).collect(),
             user_data: UserData {
                 nullifier: BigUint::from_bytes_be(&event_nullifier).to_string(),
-                citizenship: BigUint::from_str_radix(
-                    &citizenship
-                        .as_bytes()
-                        .iter()
-                        .map(|b| format!("{:02X}", b))
-                        .collect::<String>(),
-                    16,
-                )?
-                .to_string(),
+                citizenship: BigUint::from_bytes_be(&query_proof[160..192].to_vec()).to_string(),
                 identity_creation_timestamp: passport_info.identityInfo_.issueTimestamp.to_string(),
             },
         };
@@ -221,7 +225,7 @@ impl Freedomtool {
             registrationRoot_: smt_proof.root,
             currentDate_: u256_from_string(current_date_big_int.to_string())?,
             userPayload_: user_payload.into(),
-            zkPoints_: query_proof.into(), //cut pub signals
+            zkPoints_: query_proof[768..].to_vec().into(), //cut pub signals
         };
         dbg!(&inputs);
         let call_data = call_data_builder.build_noir_vote_call_data(inputs)?;
