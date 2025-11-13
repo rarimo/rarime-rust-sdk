@@ -916,8 +916,6 @@ impl RarimePassport {
                 .to_string(),
         };
 
-        dbg!(&proof_inputs);
-
         let proof_provider = ProofProvider::new();
         let query_proof = proof_provider.generate_query_proof(proof_inputs)?;
 

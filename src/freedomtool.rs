@@ -109,13 +109,10 @@ impl Freedomtool {
             rpc_url: self.config.api_configuration.voting_rpc_url.clone(),
             contract_address: id_card_voting_address,
         };
-        dbg!(&id_card_voting_config);
 
         let id_card_voting = IdCardVotingContract::new(id_card_voting_config);
-        dbg!(&id_card_voting);
 
         let proposal_rules = id_card_voting.get_proposal_rules(proposal_id).await?;
-        dbg!(&proposal_rules);
 
         let result = VotingCriteria {
             selector: proposal_rules.selector.to_string(),
@@ -160,7 +157,6 @@ impl Freedomtool {
         let proposal_state = ProposalStateContract::new(proposal_state_config);
 
         let event_id = proposal_state.get_event_id(&proposal_id).await?;
-        dbg!(&event_id);
 
         let passport_info = rarime.get_passport_info(&passport).await?;
 
@@ -185,20 +181,15 @@ impl Freedomtool {
             expiration_date_upperbound: "52983525027888".to_string(),
             citizenship_mask: "0".to_string(),
         };
-        dbg!(&query_proof_params);
+
         let query_proof = rarime
             .generate_query_proof(passport.clone(), query_proof_params)
             .await?;
 
-        for (i, chunk) in query_proof.chunks(32).take(24).enumerate() {
-            dbg!(format!("0x{}", hex::encode(chunk)));
-        }
-        dbg!(hex::encode(query_proof[768..].to_vec()));
-
         let call_data_builder = CallDataBuilder {};
 
         let passport_info = rarime.get_passport_info(&passport).await?;
-        dbg!(&passport_info);
+
         let event_nullifier = calculate_event_nullifier(
             &big_int_to_32_bytes(&BigInt::from_str(&event_id.to_string())?),
             &rarime.get_private_key()?,
@@ -213,9 +204,9 @@ impl Freedomtool {
                 identity_creation_timestamp: passport_info.identityInfo_.issueTimestamp.to_string(),
             },
         };
-        dbg!(&user_payload_inputs);
+
         let user_payload = call_data_builder.encode_user_payload(user_payload_inputs)?;
-        dbg!(hex::encode(&user_payload).len());
+
         let smt_proof = rarime.get_smt_proof(&passport).await?;
 
         let now_time = Utc::now().format("%y%m%d").to_string();
@@ -227,9 +218,8 @@ impl Freedomtool {
             userPayload_: user_payload.into(),
             zkPoints_: query_proof[768..].to_vec().into(), //cut pub signals
         };
-        dbg!(&inputs);
+
         let call_data = call_data_builder.build_noir_vote_call_data(inputs)?;
-        dbg!(&call_data.len());
 
         let result = self
             .send_transaction(&call_data, contract_voting_address)
@@ -254,7 +244,6 @@ impl Freedomtool {
                 },
             },
         };
-        dbg!(&send_transaction_request);
 
         let send_transaction = api_provider
             .relayer_send_vote_transaction(&send_transaction_request)

@@ -25,14 +25,12 @@ impl IdCardVotingContract {
 
         let contract = IdCardVoting::new(contract_address, provider);
         let proposal_id_uint256 = U256::from_str(&proposal_id)?;
-        dbg!(&proposal_id_uint256);
 
         let result = contract
             .getProposalRules(proposal_id_uint256)
             .call()
             .await?;
 
-        dbg!(&result);
         return Ok(result);
     }
 }
