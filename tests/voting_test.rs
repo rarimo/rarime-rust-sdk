@@ -37,7 +37,7 @@ mod tests {
             .unwrap();
 
         let proposal_data = freedomtool
-            .get_polls_data_ipfs(&proposal_data_contract.config.description)
+            .get_polls_data_ipfs(proposal_data_contract.config.description)
             .await
             .unwrap();
 
