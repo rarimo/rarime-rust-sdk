@@ -15,8 +15,7 @@ use contracts::contract::id_card_voting::IdCardVotingContract;
 use contracts::contract::poseidon_smt::PoseidonSmtContract;
 use contracts::contract::proposals_state::ProposalStateContract;
 use contracts::utils::{calculate_voting_event_data, u256_from_string};
-use num_bigint::BigInt;
-use num_bigint::BigUint;
+use num_bigint::{BigInt, BigUint};
 use std::str::FromStr;
 
 #[derive(Debug, Clone)]
@@ -134,15 +133,14 @@ impl Freedomtool {
         return Ok(result);
     }
 
-    pub async fn send_vote(
+    async fn build_vote_proof_inputs(
         &self,
-        answers: Vec<u8>,
         voting_criteria: VotingCriteria,
-        rarime: Rarime,
-        passport: RarimePassport,
-        contract_voting_address: String,
-        proposal_id: String,
-    ) -> Result<SendTransactionResponse, RarimeError> {
+        proposal_id: &String,
+        rarime: &Rarime,
+        passport: &RarimePassport,
+        answers: &Vec<u8>,
+    ) -> Result<QueryProofParams, RarimeError> {
         const ROOT_VALIDITY: u32 = 3600u32;
 
         let proposal_state_config = ContractCallConfig {
@@ -182,18 +180,24 @@ impl Freedomtool {
             citizenship_mask: "0".to_string(),
         };
 
-        let query_proof = rarime
-            .generate_query_proof(passport.clone(), query_proof_params)
-            .await?;
+        return Ok(query_proof_params);
+    }
 
-        let call_data_builder = CallDataBuilder {};
-
-        let passport_info = rarime.get_passport_info(&passport).await?;
-
+    async fn build_vote_call_data(
+        &self,
+        event_id: String,
+        proposal_id: String,
+        answers: Vec<u8>,
+        rarime: Rarime,
+        passport: RarimePassport,
+        query_proof: Vec<u8>,
+    ) -> Result<Vec<u8>, RarimeError> {
         let event_nullifier = calculate_event_nullifier(
-            &big_int_to_32_bytes(&BigInt::from_str(&event_id.to_string())?),
+            &big_int_to_32_bytes(&BigInt::from_str(&event_id)?),
             &rarime.get_private_key()?,
         )?;
+
+        let passport_info = rarime.get_passport_info(&passport).await?;
 
         let user_payload_inputs = UserPayloadInputs {
             proposal_id: proposal_id.clone(),
@@ -204,6 +208,8 @@ impl Freedomtool {
                 identity_creation_timestamp: passport_info.identityInfo_.issueTimestamp.to_string(),
             },
         };
+
+        let call_data_builder = CallDataBuilder {};
 
         let user_payload = call_data_builder.encode_user_payload(user_payload_inputs)?;
 
@@ -221,14 +227,45 @@ impl Freedomtool {
 
         let call_data = call_data_builder.build_noir_vote_call_data(inputs)?;
 
+        return Ok(call_data);
+    }
+
+    pub async fn send_vote(
+        &self,
+        answers: Vec<u8>,
+        voting_criteria: VotingCriteria,
+        rarime: Rarime,
+        passport: RarimePassport,
+        contract_voting_address: String,
+        proposal_id: String,
+    ) -> Result<SendTransactionResponse, RarimeError> {
+        let query_proof_params = self
+            .build_vote_proof_inputs(voting_criteria, &proposal_id, &rarime, &passport, &answers)
+            .await?;
+
+        let query_proof = rarime
+            .generate_query_proof(passport.clone(), query_proof_params.clone())
+            .await?;
+
+        let call_data = self
+            .build_vote_call_data(
+                query_proof_params.event_id,
+                proposal_id,
+                answers,
+                rarime,
+                passport,
+                query_proof,
+            )
+            .await?;
+
         let result = self
-            .send_transaction(&call_data, contract_voting_address)
+            .send_vote_transaction(&call_data, contract_voting_address)
             .await?;
 
         return Ok(result);
     }
 
-    pub async fn send_transaction(
+    async fn send_vote_transaction(
         &self,
         call_data: &Vec<u8>,
         destination: String,
