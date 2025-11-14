@@ -1,8 +1,8 @@
 # Installing Standalone Clang on macOS
 
 Start by downloading the official Clang `.dmg` and attempting a standard installation:  
-[**Download from official site
-**](https://download.developer.apple.com/Developer_Tools/Command_Line_Tools_for_Xcode_16.1/Command_Line_Tools_for_Xcode_16.1.dmg)
+**[Download from official site
+](https://download.developer.apple.com/Developer_Tools/Command_Line_Tools_for_Xcode_16.1/Command_Line_Tools_for_Xcode_16.1.dmg)**
 
 - If the installation succeeds without errors, you can skip to **Step 4** to verify the installation.
 - If an error occurs due to macOS version restrictions, follow the steps below to modify the installer and complete the
