@@ -27,6 +27,7 @@ enum RarimeError {
     "DecodeHexError",
     "ProfileKeyError",
     "SetupSDKError",
+    "ParseBigIntError",
 };
 
 enum DocumentStatus {
@@ -83,6 +84,7 @@ dictionary RarimeConfiguration {
 
 
 
+
 interface Rarime {
     [Throws=RarimeError]
     constructor(RarimeConfiguration config);
@@ -104,6 +106,75 @@ constructor();
     [Throws=RarimeError]
     sequence<u8> get_profile_key(sequence<u8> private_key);
 };
+
+
+dictionary SendTransactionResponse {
+    TxData data;
+};
+
+
+dictionary TxData {
+    string id;
+    string transaction_type;
+};
+
+dictionary VotingCriteria {
+    string selector;
+    sequence<string> citizenship_whitelist;
+    string timestamp_upperbound;
+    string identity_count_upperbound;
+    string sex;
+    string birth_date_lowerbound;
+    string birth_date_upperbound;
+    string expiration_date_lowerbound;
+};
+
+dictionary IPFSResponseData {
+    string title;
+    string? description;
+    sequence<OptionVariant> accepted_options;
+    string? image_cid;
+    boolean? ranking_based;
+};
+
+dictionary OptionVariant {
+    string title;
+    string? description;
+    sequence<string> variants;
+};
+
+dictionary FreedomtoolConfiguration {
+    FreedomtoolAPIConfiguration api_configuration;
+    FreedomtoolContractsConfiguration contracts_configuration;
+};
+
+
+dictionary FreedomtoolAPIConfiguration {
+    string voting_rpc_url;
+    string ipfs_url;
+    string relayer_url;
+};
+
+
+dictionary FreedomtoolContractsConfiguration {
+    string proposals_state_address;
+};
+
+
+interface Freedomtool {
+    [Throws=RarimeError]
+    constructor(FreedomtoolConfiguration config);
+    [Async,Throws=RarimeError]
+    boolean is_already_voted(sequence<u8> private_key, sequence<u8> event_id, string proposal_smt_address);
+    [Async,Throws=RarimeError]
+    IPFSResponseData get_polls_data_ipfs(string ipfs_index);
+    [Async,Throws=RarimeError]
+    VotingCriteria get_proposal_rules(string proposal_id, string id_card_voting_address);
+    [Async,Throws=RarimeError]
+    SendTransactionResponse send_vote(sequence<u8> answers, VotingCriteria voting_criteria, Rarime rarime, RarimePassport passport, string contract_voting_address, string proposal_id);
+
+};
+
 
 
 namespace RarimeSDK {
