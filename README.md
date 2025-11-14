@@ -48,20 +48,15 @@ This architecture allows us to:
 
 ## 📦 Getting Started
 
-To build this SDK, please use a **standalone Clang** compiler, version **16.0.0 or lower**.  
-C/C++ components are built using **CMake** and **Ninja**.
+## 🛠 Build Requirements
 
-### Prerequisites
+To successfully build this SDK, the following tools and versions are required:
 
-- [Rust Toolchain](https://rustup.rs/)
-- [UniFFI CLI](https://mozilla.github.io/uniffi-rs/)
-
-### Before You Begin
-
-Make sure you have the following installed:
-
-- **Clang ≤ 16.0.0**
-- **CMake** and **Ninja** for building C/C++ code
+- **Standalone Clang version <= 16.0.0**
+- **CMake**
+- **Ninja**
+- [**Rust Toolchain**](https://rustup.rs/)
+- [**UniFFI CLI**](https://mozilla.github.io/uniffi-rs/)
 
 Install UniFFI:
 
