@@ -16,11 +16,10 @@ Follow the steps below.
 
 ---
 
-## 1. Download and Extract the `.pkg` File
+## 1. Extract the `.pkg` File
 
-1. Download the official **Standalone Clang `.dmg`**.
-2. Mount it and locate the `.pkg` inside.
-3. Extract the contents of the package:
+1. Mount downloaded `.dmg` and locate the `.pkg` inside.
+2. Extract the contents of the package:
 
 ```bash
 pkgutil --expand path_to_file.pkg extracted_pkg/
