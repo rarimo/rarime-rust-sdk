@@ -48,15 +48,21 @@ This architecture allows us to:
 
 ## 📦 Getting Started
 
-### Prerequisites
+## 🛠 Build Requirements
 
-- [Rust Toolchain](https://rustup.rs/)
-- [UniFFI CLI](https://mozilla.github.io/uniffi-rs/)
+To successfully build this SDK, the following tools and versions are required:
+
+- **Standalone Clang version <= 16.0.0**
+    - see installation for macOS [click](docs/MacOS-clang-install.md)
+- **CMake**
+- **Ninja**
+- [**Rust Toolchain**](https://rustup.rs/)
+- [**UniFFI CLI**](https://mozilla.github.io/uniffi-rs/)
 
 Install UniFFI:
 
 ```bash
-cargo install uniffi_bindgen --version <USED_VERSION>
+ cargo install uniffi --version 0.30.0 --features cli
 ```
 
 ### Build from Source
