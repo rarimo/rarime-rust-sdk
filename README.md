@@ -53,6 +53,7 @@ This architecture allows us to:
 To successfully build this SDK, the following tools and versions are required:
 
 - **Standalone Clang version <= 16.0.0**
+    - see detailed about install for macOS [click](docs/MacOS-clang-install.md)
 - **CMake**
 - **Ninja**
 - [**Rust Toolchain**](https://rustup.rs/)
