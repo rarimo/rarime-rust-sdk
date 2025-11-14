@@ -1,16 +1,15 @@
 use crate::hash_algorithm::HashAlgorithm;
 use crate::signature_algorithm::SignatureAlgorithm;
-use crate::utils::{
-    convert_asn1_to_pem, extract_oid_from_asn1, get_smt_proof_index, poseidon_hash_32_bytes,
-    vec_u8_to_u8_32,
-};
-use crate::{QueryProofParams, RarimeError, RarimeUtils};
+use crate::utils::{convert_asn1_to_pem, extract_oid_from_asn1, poseidon_hash_32_bytes};
+use crate::{QueryProofParams, RarimeError};
 use chrono::Utc;
-use contracts::{ContractsProvider, ContractsProviderConfig};
+use contracts::SparseMerkleTree::Proof;
+use contracts::StateKeeper::getPassportInfoReturn;
 use num_bigint::BigInt;
-use num_traits::{One, Zero};
+use num_traits::{Num, One, Zero};
 use proofs::{LiteRegisterProofInput, ProofProvider, QueryProofInput};
 use simple_asn1::{ASN1Block, ASN1Class, BigUint, from_der, to_der};
+use std::vec;
 
 enum ActiveAuthKey {
     Rsa { modulus: BigInt, exponent: BigInt },
@@ -33,27 +32,6 @@ pub struct RarimePassport {
     pub sod: Vec<u8>,
 }
 
-pub(crate) async fn get_document_status(
-    passport_key: &[u8; 32],
-    profile_key: &[u8; 32],
-    config: ContractsProviderConfig,
-) -> Result<DocumentStatus, RarimeError> {
-    let contacts = ContractsProvider::new(config);
-    let passport_info = contacts.get_passport_info(passport_key).await?;
-
-    let zero_bytes: [u8; 32] = [0u8; 32];
-
-    let active_identity = passport_info.passportInfo_.activeIdentity;
-
-    if active_identity == zero_bytes {
-        return Ok(DocumentStatus::NotRegistered);
-    }
-    if active_identity == profile_key {
-        return Ok(DocumentStatus::RegisteredWithThisPk);
-    }
-    Ok(DocumentStatus::RegisteredWithOtherPk)
-}
-
 impl RarimePassport {
     pub(crate) fn get_passport_key(&self) -> Result<[u8; 32], RarimeError> {
         if let Some(dg15_bytes) = &self.data_group15 {
@@ -71,6 +49,24 @@ impl RarimePassport {
         let passport_key = self.get_passport_hash()?;
 
         Ok(passport_key)
+    }
+
+    pub async fn get_document_status(
+        &self,
+        profile_key: &[u8; 32],
+        passport_info: getPassportInfoReturn,
+    ) -> Result<DocumentStatus, RarimeError> {
+        let zero_bytes: [u8; 32] = [0u8; 32];
+
+        let active_identity = passport_info.passportInfo_.activeIdentity;
+
+        if active_identity == zero_bytes {
+            return Ok(DocumentStatus::NotRegistered);
+        }
+        if active_identity == profile_key {
+            return Ok(DocumentStatus::RegisteredWithThisPk);
+        }
+        Ok(DocumentStatus::RegisteredWithOtherPk)
     }
 
     pub(crate) fn get_passport_hash(&self) -> Result<[u8; 32], RarimeError> {
@@ -880,41 +876,22 @@ impl RarimePassport {
     pub async fn generate_document_query_proof(
         &self,
         params: QueryProofParams,
-        passport_key: &[u8; 32],
         pk_key: &[u8; 32],
-        config: ContractsProviderConfig,
+        smt_proof: Proof,
+        passport_info: getPassportInfoReturn,
     ) -> Result<Vec<u8>, RarimeError> {
-        let contacts = ContractsProvider::new(config);
-
-        let utils = RarimeUtils::new();
-
-        let profile_key = vec_u8_to_u8_32(&utils.get_profile_key(pk_key.to_vec())?)?;
-
-        let passport_info = contacts.get_passport_info(&passport_key).await?;
-
-        if (profile_key != passport_info.passportInfo_.activeIdentity) {
-            return Err(RarimeError::ProfileKeyError(format!(
-                "profile key mismatch. profile_key = {},   passport_info.passportInfo_.activeIdentity= {}",
-                hex::encode(profile_key),
-                hex::encode(passport_info.passportInfo_.activeIdentity)
-            )));
-        }
-
-        let smt_proof_index = get_smt_proof_index(&passport_key, &profile_key)?;
-
-        let smt_proof = contacts.get_smt_proof(&smt_proof_index).await?;
-
         let now_time = Utc::now();
 
         let proof_inputs = QueryProofInput {
             event_id: params.event_id, //from input
-            event_data: BigUint::from_bytes_be(&hex::decode(
-                params.event_data.chars().skip(2).collect::<String>(),
-            )?)
-            .to_str_radix(10),
+            event_data: params.event_data,
             id_state_root: BigUint::from_bytes_be(smt_proof.root.as_slice()).to_str_radix(10), //from SMT
             selector: params.selector, //from input
-            current_date: format!("0x{}", hex::encode(now_time.format("%y%m%d").to_string())),
+            current_date: BigUint::from_str_radix(
+                &hex::encode(now_time.format("%y%m%d").to_string()),
+                16,
+            )?
+            .to_string(),
             timestamp_lowerbound: params.timestamp_lowerbound, //from input
             timestamp_upperbound: params.timestamp_upperbound, //from input
             identity_count_lowerbound: params.identity_count_lowerbound, //from input
@@ -925,7 +902,7 @@ impl RarimePassport {
             expiration_date_upperbound: params.expiration_date_upperbound, //from input
             citizenship_mask: params.citizenship_mask,         //from input
             sk_identity: BigUint::from_bytes_be(pk_key).to_str_radix(10),
-            pk_passport_hash: BigUint::from_bytes_be(&self.get_passport_key()?).to_str_radix(10),
+            pk_passport_hash: BigUint::from_bytes_be(&self.get_passport_key()?).to_string(),
             dg1: self.data_group1.clone(),
             siblings: smt_proof
                 .siblings
@@ -943,5 +920,93 @@ impl RarimePassport {
         let query_proof = proof_provider.generate_query_proof(proof_inputs)?;
 
         return Ok(query_proof);
+    }
+
+    pub fn get_mrz_string(&self) -> Result<String, RarimeError> {
+        let dg_1 = &self.data_group1;
+
+        let blocks = from_der(dg_1).map_err(|e| RarimeError::ASN1DecodeError(e))?;
+
+        let first = blocks
+            .get(0)
+            .ok_or_else(|| RarimeError::ASN1RouteError("No ASN.1 blocks found".to_string()))?;
+
+        match first {
+            ASN1Block::Explicit(ASN1Class::Application, _, tag1, content_box)
+                if tag1 == &BigUint::from(1u32) =>
+            {
+                match content_box.as_ref() {
+                    ASN1Block::Explicit(ASN1Class::Application, _, tag2, inner_box)
+                        if tag2 == &BigUint::from(31u32) =>
+                    {
+                        match inner_box.as_ref() {
+                            ASN1Block::OctetString(_, data) => {
+                                return Ok(String::from_utf8_lossy(data).into_owned());
+                            }
+                            ASN1Block::PrintableString(_, s) => {
+                                return Ok(s.to_string());
+                            }
+                            ASN1Block::UTF8String(_, s) => {
+                                return Ok(s.to_string());
+                            }
+                            other => {
+                                return Err(RarimeError::ASN1RouteError(format!(
+                                    "Unexpected inner ASN1 type: {:?}",
+                                    other
+                                )));
+                            }
+                        }
+                    }
+
+                    ASN1Block::Unknown(_, _, _, tag2, bytes) if tag2 == &BigUint::from(31u32) => {
+                        if let Ok(inner_blocks) = from_der(bytes) {
+                            if let Some(b0) = inner_blocks.get(0) {
+                                match b0 {
+                                    ASN1Block::OctetString(_, data) => {
+                                        return Ok(String::from_utf8_lossy(data).into_owned());
+                                    }
+                                    ASN1Block::PrintableString(_, s) => {
+                                        return Ok(s.to_string());
+                                    }
+                                    ASN1Block::UTF8String(_, s) => {
+                                        return Ok(s.to_string());
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+
+                        let s = String::from_utf8_lossy(bytes)
+                            .trim_end_matches('\0')
+                            .to_string();
+                        return Ok(s);
+                    }
+
+                    ASN1Block::OctetString(_, data) => {
+                        return Ok(String::from_utf8_lossy(data).into_owned());
+                    }
+                    ASN1Block::PrintableString(_, s) => {
+                        return Ok(s.to_string());
+                    }
+
+                    other => {
+                        return Err(RarimeError::ASN1RouteError(format!(
+                            "Expected Application 31 inside Application 1, got {:?}",
+                            other
+                        )));
+                    }
+                }
+            }
+            _ => {
+                return Err(RarimeError::ASN1RouteError(
+                    "Expected top-level Application 1".to_string(),
+                ));
+            }
+        }
+    }
+
+    pub fn get_citizenship(&self, mrz_string: String) -> Result<String, RarimeError> {
+        let result = mrz_string[2..5].to_string();
+        return Ok(result);
     }
 }

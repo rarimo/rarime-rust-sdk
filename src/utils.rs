@@ -167,3 +167,23 @@ pub fn get_smt_proof_index(
 
     return Ok(result);
 }
+
+pub fn calculate_event_nullifier(
+    event_id: &[u8; 32],
+    private_key: &[u8; 32],
+) -> Result<[u8; 32], RarimeError> {
+    let private_key_big_int = BigInt::from_bytes_be(Sign::Plus, private_key);
+
+    let secret_key_hash = poseidon_hash_32_bytes(&vec![private_key_big_int.clone()])?;
+    let secret_key_hash_big_int = BigInt::from_bytes_be(Sign::Plus, secret_key_hash.as_slice());
+
+    let event_id_big_int = BigInt::from_bytes_be(Sign::Plus, event_id);
+
+    let event_nullifier = poseidon_hash_32_bytes(&vec![
+        private_key_big_int,
+        secret_key_hash_big_int,
+        event_id_big_int,
+    ])?;
+
+    return Ok(event_nullifier);
+}

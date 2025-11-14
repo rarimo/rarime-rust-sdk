@@ -2,10 +2,11 @@
 mod tests {
     use base64::Engine;
     use base64::engine::general_purpose::STANDARD;
-    use rarime_rust_sdk::{
-        QueryProofParams, Rarime, RarimeAPIConfiguration, RarimeConfiguration,
-        RarimeContractsConfiguration, RarimePassport, RarimeUserConfiguration,
+    use rarime_rust_sdk::rarime::{
+        Rarime, RarimeAPIConfiguration, RarimeConfiguration, RarimeContractsConfiguration,
+        RarimeUserConfiguration,
     };
+    use rarime_rust_sdk::{QueryProofParams, RarimePassport};
     use serde_json::Value;
     use std::fs;
 
@@ -16,8 +17,7 @@ mod tests {
 
         let rarime_config = RarimeConfiguration {
             contracts_configuration: RarimeContractsConfiguration {
-                state_keeper_contract_address: "0x9EDADB216C1971cf0343b8C687cF76E7102584DB"
-                    .to_string(),
+                state_keeper_address: "0x9EDADB216C1971cf0343b8C687cF76E7102584DB".to_string(),
                 register_contract_address: "0xd63782478CA40b587785700Ce49248775398b045".to_string(),
                 poseidon_smt_address: "0xF19a85B10d705Ed3bAF3c0eCe3E73d8077Bf6481".to_string(),
             },
@@ -27,7 +27,7 @@ mod tests {
             },
             user_configuration: RarimeUserConfiguration {
                 user_private_key: hex::decode(
-                    "0a790217c78ea3fe909b34e5f911a2a0556e06b18c2324027b2a045ac05430c3",
+                    "090ad31e17fa6d91dd575249db8e721262f988eac3bfe9b4d5366415a7995865",
                 )
                 .unwrap(),
             },
@@ -39,7 +39,9 @@ mod tests {
             data_group1: STANDARD
                 .decode(json_value.get("dg1").unwrap().as_str().unwrap())
                 .unwrap(),
-            data_group15: Some(
+            data_group15:
+            // None,
+            Some(
                 STANDARD
                     .decode(json_value.get("dg15").unwrap().as_str().unwrap())
                     .unwrap(),
@@ -53,18 +55,19 @@ mod tests {
 
         let query_params = QueryProofParams {
             event_id: "43580365239758335475".to_string(),
-            event_data: "0x98d622d3d4ede97469fb2152b1c9d4e4470b354db2c07afaa3846ca0d885af"
-                .to_string(),
+            event_data:
+                "270038666511201875208172000617689023489105079510191335498520083214634616239"
+                    .to_string(),
             selector: "0".to_string(),
             timestamp_lowerbound: "0".to_string(),
             timestamp_upperbound: "0".to_string(),
             identity_count_lowerbound: "0".to_string(),
             identity_count_upperbound: "0".to_string(),
-            birth_date_lowerbound: "0x303030303030".to_string(),
-            birth_date_upperbound: "0x303030303030".to_string(),
-            expiration_date_lowerbound: "0x303030303030".to_string(),
-            expiration_date_upperbound: "0x303030303030".to_string(),
-            citizenship_mask: "0x00".to_string(),
+            birth_date_lowerbound: "52983525027888".to_string(),
+            birth_date_upperbound: "52983525027888".to_string(),
+            expiration_date_lowerbound: "52983525027888".to_string(),
+            expiration_date_upperbound: "52983525027888".to_string(),
+            citizenship_mask: "0".to_string(),
         };
 
         let result = tokio::task::spawn_blocking({
@@ -76,6 +79,11 @@ mod tests {
         .await
         .unwrap()
         .unwrap();
+
+        for (i, chunk) in result.chunks(32).take(24).enumerate() {
+            dbg!(format!("0x{}", hex::encode(chunk)));
+        }
+        dbg!(hex::encode(result[768..].to_vec()));
 
         dbg!(hex::encode(&result));
     }

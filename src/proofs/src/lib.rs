@@ -128,6 +128,7 @@ impl ProofProvider {
             .iter()
             .map(|s| s.as_str())
             .collect::<Vec<_>>();
+
         let initial_witness = from_vec_str_to_witness_map(witness_input_refs.clone())
             .map_err(|e| ProofError::Witness(e))?;
 
