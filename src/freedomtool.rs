@@ -1,5 +1,5 @@
 use crate::rarime::Rarime;
-use crate::utils::{big_int_to_32_bytes, calculate_event_nullifier, vec_u8_to_u8_32};
+use crate::utils::{calculate_event_nullifier, vec_u8_to_u8_32};
 use crate::{QueryProofParams, RarimeError, RarimePassport, VotingCriteria};
 use api::types::ipfs_voting::IPFSResponseData;
 use api::types::relayer_send_transaction::{
@@ -15,7 +15,7 @@ use contracts::contract::id_card_voting::IdCardVotingContract;
 use contracts::contract::poseidon_smt::PoseidonSmtContract;
 use contracts::contract::proposals_state::ProposalStateContract;
 use contracts::utils::{calculate_voting_event_data, u256_from_string};
-use num_bigint::{BigInt, BigUint};
+use num_bigint::BigUint;
 use std::str::FromStr;
 
 #[derive(Debug, Clone)]
@@ -49,11 +49,13 @@ impl Freedomtool {
     /// Make sure to parse it before using the result.
     pub async fn get_polls_data_ipfs(
         &self,
-        ipfs_index: &String,
+        ipfs_index: String,
     ) -> Result<IPFSResponseData, RarimeError> {
         let ipfs_provider = IPFSApiProvider::new(&self.config.api_configuration.ipfs_url)?;
 
         let proposal_data = ipfs_provider.get_proposal_data(&ipfs_index).await?;
+
+        //let result = proposal_data
 
         return Ok(proposal_data);
     }
@@ -81,7 +83,7 @@ impl Freedomtool {
     pub async fn is_already_voted(
         &self,
         private_key: Vec<u8>,
-        event_id: &[u8; 32],
+        event_id: Vec<u8>,
         proposal_smt_address: String,
     ) -> Result<bool, RarimeError> {
         let proposal_smt_call_config = ContractCallConfig {
@@ -93,7 +95,8 @@ impl Freedomtool {
 
         let private_key_u8_32 = vec_u8_to_u8_32(&private_key)?;
 
-        let nullifier = calculate_event_nullifier(event_id, &private_key_u8_32)?;
+        let nullifier =
+            calculate_event_nullifier(&vec_u8_to_u8_32(&event_id)?, &private_key_u8_32)?;
         let smt_proof = poseidon_smt.get_proof_call(&nullifier).await?;
 
         return Ok(smt_proof.existence);
@@ -192,10 +195,7 @@ impl Freedomtool {
         passport: RarimePassport,
         query_proof: Vec<u8>,
     ) -> Result<Vec<u8>, RarimeError> {
-        let event_nullifier = calculate_event_nullifier(
-            &big_int_to_32_bytes(&BigInt::from_str(&event_id)?),
-            &rarime.get_private_key()?,
-        )?;
+        let event_nullifier = rarime.calculate_event_nullifier(event_id)?;
 
         let passport_info = rarime.get_passport_info(&passport).await?;
 

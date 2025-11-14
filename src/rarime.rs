@@ -1,4 +1,6 @@
-use crate::utils::{get_smt_proof_index, vec_u8_to_u8_32};
+use crate::utils::{
+    big_int_to_32_bytes, calculate_event_nullifier, get_smt_proof_index, vec_u8_to_u8_32,
+};
 use crate::{DocumentStatus, QueryProofParams, RarimeError, RarimePassport, rarime_utils};
 use api::ApiProvider;
 use api::types::relayer_light_register::{LiteRegisterData, LiteRegisterRequest};
@@ -10,11 +12,13 @@ use contracts::call_data_builder::CallDataBuilder;
 use contracts::contract::poseidon_smt::PoseidonSmtContract;
 use contracts::contract::state_keeper::StateKeeperContract;
 use contracts::utils::convert_to_u256;
+use std::str::FromStr;
 
 use crate::rarimo_utils::RarimeUtils;
 use contracts::RegistrationSimple::{Passport, registerSimpleViaNoirCall};
 use contracts::SparseMerkleTree::Proof;
 use contracts::StateKeeper::getPassportInfoReturn;
+use num_bigint::BigInt;
 use simple_asn1::to_der;
 
 #[derive(Debug, Clone)]
@@ -293,10 +297,11 @@ impl Rarime {
         return Ok(smt_proof);
     }
 
-    pub fn get_private_key(&self) -> Result<[u8; 32], RarimeError> {
-        let private_key = self.config.user_configuration.user_private_key.clone();
-
-        let result = vec_u8_to_u8_32(&private_key)?;
+    pub fn calculate_event_nullifier(&self, event_id: String) -> Result<[u8; 32], RarimeError> {
+        let result = calculate_event_nullifier(
+            &big_int_to_32_bytes(&BigInt::from_str(&event_id)?),
+            &vec_u8_to_u8_32(&self.config.user_configuration.user_private_key.clone())?,
+        )?;
 
         return Ok(result);
     }
