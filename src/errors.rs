@@ -4,6 +4,7 @@ use contracts::errors::ContractsError;
 use hex::FromHexError;
 use num_bigint::ParseBigIntError;
 use proofs::ProofError;
+use std::num::ParseIntError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -64,4 +65,8 @@ pub enum RarimeError {
     SetupSDKError(String),
     #[error("Failed parse bigint error: {0}")]
     ParseBigIntError(#[from] ParseBigIntError),
+    #[error("Failed parse int error: {0}")]
+    ParseIntError(#[from] ParseIntError),
+    #[error("Failed parse bigint error: {0}")]
+    ValidationError(String),
 }
