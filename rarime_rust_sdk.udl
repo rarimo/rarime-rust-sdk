@@ -108,15 +108,6 @@ constructor();
 };
 
 
-dictionary SendTransactionResponse {
-    TxData data;
-};
-
-
-dictionary TxData {
-    string id;
-    string transaction_type;
-};
 
 dictionary VotingCriteria {
     string selector;
@@ -129,19 +120,7 @@ dictionary VotingCriteria {
     string expiration_date_lowerbound;
 };
 
-dictionary IPFSResponseData {
-    string title;
-    string? description;
-    sequence<OptionVariant> accepted_options;
-    string? image_cid;
-    boolean? ranking_based;
-};
 
-dictionary OptionVariant {
-    string title;
-    string? description;
-    sequence<string> variants;
-};
 
 dictionary FreedomtoolConfiguration {
     FreedomtoolAPIConfiguration api_configuration;
@@ -160,18 +139,38 @@ dictionary FreedomtoolContractsConfiguration {
     string proposals_state_address;
 };
 
+dictionary Question {
+    string title;
+    string? description;
+    sequence<string> variants;
+};
+
+dictionary ProposalData {
+    string poll_id;
+    string proposal_smt_address;
+    VotingCriteria criteria;
+    u8 status;
+    u64 start_timestamp;
+    u64 poll_duration;
+    string? image_cid;
+    string send_vote_contract_address;
+    string title;
+    string? description;
+    sequence<Question> questions;
+    boolean? ranking_based;
+    sequence<sequence<string>> voting_results;
+};
+
 
 interface Freedomtool {
     [Throws=RarimeError]
     constructor(FreedomtoolConfiguration config);
     [Async,Throws=RarimeError]
-    boolean is_already_voted(sequence<u8> private_key, sequence<u8> event_id, string proposal_smt_address);
+    ProposalData get_proposal_data(string poll_id);
     [Async,Throws=RarimeError]
-    IPFSResponseData get_polls_data_ipfs(string ipfs_index);
+    boolean is_already_voted(sequence<u8> private_key, ProposalData poll_data);
     [Async,Throws=RarimeError]
-    VotingCriteria get_proposal_rules(string proposal_id, string id_card_voting_address);
-    [Async,Throws=RarimeError]
-    SendTransactionResponse send_vote(sequence<u8> answers, VotingCriteria voting_criteria, Rarime rarime, RarimePassport passport, string contract_voting_address, string proposal_id);
+    string send_vote(sequence<u8> answers, ProposalData poll_data, Rarime rarime, RarimePassport passport);
 
 };
 
