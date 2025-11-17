@@ -1,18 +1,18 @@
 use crate::RarimeError;
 use crate::RarimeError::PoseidonHashError;
-use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
 use const_oid::ObjectIdentifier;
 use ff::{PrimeField, PrimeFieldRepr};
 use num_bigint::{BigInt, Sign};
 use num_traits::Zero;
 use poseidon_rs::{Fr, FrRepr};
-use simple_asn1::{ASN1Block, to_der};
+use simple_asn1::{to_der, ASN1Block};
 use std::io::Cursor;
 
 pub mod rarime_utils {
-    use crate::RarimeError;
     use crate::utils::poseidon_hash_32_bytes;
+    use crate::RarimeError;
     use babyjubjub_rs::new_key;
     use ff::{PrimeField, PrimeFieldRepr};
     use num_bigint::BigInt;
@@ -167,3 +167,5 @@ pub fn get_smt_proof_index(
 
     return Ok(result);
 }
+
+

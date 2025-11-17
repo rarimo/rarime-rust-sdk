@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 
 ///Request types
-
 #[derive(Serialize, Debug)]
 pub struct DocumentSod {
     pub hash_algorithm: String,
@@ -35,7 +34,6 @@ pub struct VerifySodRequest {
 }
 
 ///Response types
-
 #[derive(Deserialize, Debug)]
 pub struct LightRegistrationData {
     pub passport_hash: String,
@@ -58,7 +56,6 @@ pub struct VerifySodResponse {
 }
 
 ///Error response types
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ErrorDetail {
     pub title: String,

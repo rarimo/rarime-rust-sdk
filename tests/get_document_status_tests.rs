@@ -2,9 +2,11 @@
 mod tests {
     use base64::Engine;
     use base64::engine::general_purpose::STANDARD;
-    use rarime_rust_sdk::{
+
+    use rarime_rust_sdk::RarimePassport;
+    use rarime_rust_sdk::rarime::{
         Rarime, RarimeAPIConfiguration, RarimeConfiguration, RarimeContractsConfiguration,
-        RarimePassport, RarimeUserConfiguration,
+        RarimeUserConfiguration,
     };
     use serde_json::Value;
     use std::fs;
@@ -15,10 +17,9 @@ mod tests {
         let json_value: Value = serde_json::from_str(&json_string).unwrap();
         let rarime_config = RarimeConfiguration {
             contracts_configuration: RarimeContractsConfiguration {
-                state_keeper_contract_address: "0x9EDADB216C1971cf0343b8C687cF76E7102584DB"
-                    .to_string(),
-                register_contract_address: "".to_string(),
-                poseidon_smt_address: "".to_string(),
+                state_keeper_address: "0x9EDADB216C1971cf0343b8C687cF76E7102584DB".to_string(),
+                register_contract_address: "0xd63782478CA40b587785700Ce49248775398b045".to_string(),
+                poseidon_smt_address: "0xF19a85B10d705Ed3bAF3c0eCe3E73d8077Bf6481".to_string(),
             },
             api_configuration: RarimeAPIConfiguration {
                 json_rpc_evm_url: "https://rpc.evm.mainnet.rarimo.com".to_string(),
@@ -59,8 +60,7 @@ mod tests {
         let json_value: Value = serde_json::from_str(&json_string).unwrap();
         let rarime_config = RarimeConfiguration {
             contracts_configuration: RarimeContractsConfiguration {
-                state_keeper_contract_address: "0x9EDADB216C1971cf0343b8C687cF76E7102584DB"
-                    .to_string(),
+                state_keeper_address: "0x9EDADB216C1971cf0343b8C687cF76E7102584DB".to_string(),
                 register_contract_address: "".to_string(),
                 poseidon_smt_address: "".to_string(),
             },
@@ -103,8 +103,7 @@ mod tests {
         let json_value: Value = serde_json::from_str(&json_string).unwrap();
         let rarime_config = RarimeConfiguration {
             contracts_configuration: RarimeContractsConfiguration {
-                state_keeper_contract_address: "0x9EDADB216C1971cf0343b8C687cF76E7102584DB"
-                    .to_string(),
+                state_keeper_address: "0x9EDADB216C1971cf0343b8C687cF76E7102584DB".to_string(),
                 register_contract_address: "".to_string(),
                 poseidon_smt_address: "".to_string(),
             },

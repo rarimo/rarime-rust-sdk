@@ -2,22 +2,23 @@
 mod tests {
     use base64::Engine;
     use base64::engine::general_purpose::STANDARD;
-    use rarime_rust_sdk::{
+    use rarime_rust_sdk::RarimePassport;
+    use rarime_rust_sdk::rarime::{
         Rarime, RarimeAPIConfiguration, RarimeConfiguration, RarimeContractsConfiguration,
-        RarimePassport, RarimeUserConfiguration, RarimeUtils,
+        RarimeUserConfiguration,
     };
+    use rarime_rust_sdk::rarimo_utils::RarimeUtils;
     use serde_json::Value;
     use std::fs;
 
     #[tokio::test]
     async fn test_light_registration() {
-        let json_string = fs::read_to_string("./tests/assets/passports/id_card3.json").unwrap();
+        let json_string = fs::read_to_string("./tests/assets/passports/id_card.json").unwrap();
         let json_value: Value = serde_json::from_str(&json_string).unwrap();
 
         let rarime_config = RarimeConfiguration {
             contracts_configuration: RarimeContractsConfiguration {
-                state_keeper_contract_address: "0x9EDADB216C1971cf0343b8C687cF76E7102584DB"
-                    .to_string(),
+                state_keeper_address: "0x9EDADB216C1971cf0343b8C687cF76E7102584DB".to_string(),
                 register_contract_address: "0xd63782478CA40b587785700Ce49248775398b045".to_string(),
                 poseidon_smt_address: "".to_string(),
             },
@@ -40,11 +41,12 @@ mod tests {
             data_group1: STANDARD
                 .decode(json_value.get("dg1").unwrap().as_str().unwrap())
                 .unwrap(),
-            data_group15: Some(
-                STANDARD
-                    .decode(json_value.get("dg15").unwrap().as_str().unwrap())
-                    .unwrap(),
-            ),
+            data_group15: None,
+            // Some(
+            //     STANDARD
+            //         .decode(json_value.get("dg15").unwrap().as_str().unwrap())
+            //         .unwrap(),
+            // ),
             aa_signature: None,
             aa_challenge: None,
             sod: STANDARD

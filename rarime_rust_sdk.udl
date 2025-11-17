@@ -27,6 +27,9 @@ enum RarimeError {
     "DecodeHexError",
     "ProfileKeyError",
     "SetupSDKError",
+    "ParseBigIntError",
+    "ParseIntError",
+    "ValidationError"
 };
 
 enum DocumentStatus {
@@ -83,6 +86,7 @@ dictionary RarimeConfiguration {
 
 
 
+
 interface Rarime {
     [Throws=RarimeError]
     constructor(RarimeConfiguration config);
@@ -104,6 +108,75 @@ constructor();
     [Throws=RarimeError]
     sequence<u8> get_profile_key(sequence<u8> private_key);
 };
+
+
+
+dictionary VotingCriteria {
+    string selector;
+    sequence<string> citizenship_whitelist;
+    string timestamp_upperbound;
+    string identity_count_upperbound;
+    string sex;
+    string birth_date_lowerbound;
+    string birth_date_upperbound;
+    string expiration_date_lowerbound;
+};
+
+
+
+dictionary FreedomtoolConfiguration {
+    FreedomtoolAPIConfiguration api_configuration;
+    FreedomtoolContractsConfiguration contracts_configuration;
+};
+
+
+dictionary FreedomtoolAPIConfiguration {
+    string voting_rpc_url;
+    string ipfs_url;
+    string relayer_url;
+};
+
+
+dictionary FreedomtoolContractsConfiguration {
+    string proposals_state_address;
+};
+
+dictionary Question {
+    string title;
+    string? description;
+    sequence<string> variants;
+};
+
+dictionary ProposalData {
+    string poll_id;
+    string proposal_smt_address;
+    VotingCriteria criteria;
+    u8 status;
+    u64 start_timestamp;
+    u64 poll_duration;
+    string? image_cid;
+    string send_vote_contract_address;
+    string title;
+    string? description;
+    sequence<Question> questions;
+    boolean? ranking_based;
+    sequence<sequence<string>> voting_results;
+};
+
+
+interface Freedomtool {
+    [Throws=RarimeError]
+    constructor(FreedomtoolConfiguration config);
+    [Async,Throws=RarimeError]
+    ProposalData get_proposal_data(string poll_id);
+    [Async,Throws=RarimeError]
+    boolean is_already_voted(sequence<u8> private_key, ProposalData poll_data);
+    [Async,Throws=RarimeError]
+    string send_vote(sequence<u8> answers, ProposalData poll_data, Rarime rarime, RarimePassport passport);
+    [Async,Throws=RarimeError]
+    void validate(RarimePassport passport, Rarime rarime, ProposalData poll_data);
+};
+
 
 
 namespace RarimeSDK {
