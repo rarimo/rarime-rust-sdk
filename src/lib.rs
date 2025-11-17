@@ -41,14 +41,4 @@ pub struct QueryProofParams {
     pub citizenship_mask: String,
 }
 
-#[derive(Debug, Clone)]
-pub struct VotingCriteria {
-    pub selector: String,
-    pub citizenship_whitelist: Vec<String>,
-    pub timestamp_upperbound: String,
-    pub identity_count_upperbound: String,
-    pub sex: String,
-    pub birth_date_lowerbound: String,
-    pub birth_date_upperbound: String,
-    pub expiration_date_lowerbound: String,
-}
+
