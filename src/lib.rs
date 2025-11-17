@@ -15,13 +15,13 @@ mod hash_algorithm;
 pub mod masters_certificate_pool;
 mod owned_cert;
 pub mod passport;
+pub mod poll;
 pub mod rarime;
 pub mod rarimo_utils;
 pub mod rfc;
 mod signature_algorithm;
 mod treap_tree;
 mod utils;
-
 // /// UniFFI setup
 // uniffi::include_scaffolding!("rarime_rust_sdk");
 
