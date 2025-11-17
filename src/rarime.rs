@@ -1,24 +1,23 @@
-use crate::utils::{
-    big_int_to_32_bytes, calculate_event_nullifier, get_smt_proof_index, vec_u8_to_u8_32,
-};
-use crate::{DocumentStatus, QueryProofParams, RarimeError, RarimePassport, rarime_utils};
-use api::ApiProvider;
+use crate::utils::{get_smt_proof_index, poseidon_hash_32_bytes, vec_u8_to_u8_32};
+use crate::{rarime_utils, DocumentStatus, QueryProofParams, RarimeError, RarimePassport};
 use api::types::relayer_light_register::{LiteRegisterData, LiteRegisterRequest};
 use api::types::verify_sod::{Attributes, Data, DocumentSod, VerifySodRequest, VerifySodResponse};
-use base64::Engine;
+use api::ApiProvider;
 use base64::engine::general_purpose::STANDARD;
-use contracts::ContractCallConfig;
+use base64::Engine;
 use contracts::call_data_builder::CallDataBuilder;
 use contracts::contract::poseidon_smt::PoseidonSmtContract;
 use contracts::contract::state_keeper::StateKeeperContract;
 use contracts::utils::convert_to_u256;
+use contracts::ContractCallConfig;
 use std::str::FromStr;
 
+use crate::poll::VotingCriteria;
 use crate::rarimo_utils::RarimeUtils;
-use contracts::RegistrationSimple::{Passport, registerSimpleViaNoirCall};
+use contracts::RegistrationSimple::{registerSimpleViaNoirCall, Passport};
 use contracts::SparseMerkleTree::Proof;
 use contracts::StateKeeper::getPassportInfoReturn;
-use num_bigint::BigInt;
+use num_bigint::{BigInt, Sign};
 use simple_asn1::to_der;
 
 #[derive(Debug, Clone)]
@@ -298,11 +297,46 @@ impl Rarime {
     }
 
     pub fn calculate_event_nullifier(&self, event_id: String) -> Result<[u8; 32], RarimeError> {
-        let result = calculate_event_nullifier(
-            &big_int_to_32_bytes(&BigInt::from_str(&event_id)?),
-            &vec_u8_to_u8_32(&self.config.user_configuration.user_private_key.clone())?,
-        )?;
+        let private_key_big_int =
+            BigInt::from_bytes_be(Sign::Plus, &self.config.user_configuration.user_private_key);
 
-        return Ok(result);
+        let secret_key_hash = poseidon_hash_32_bytes(&vec![private_key_big_int.clone()])?;
+        let secret_key_hash_big_int = BigInt::from_bytes_be(Sign::Plus, secret_key_hash.as_slice());
+
+        let event_id_big_int = BigInt::from_str(&event_id)?;
+
+        let event_nullifier = poseidon_hash_32_bytes(&vec![
+            private_key_big_int,
+            secret_key_hash_big_int,
+            event_id_big_int,
+        ])?;
+
+        return Ok(event_nullifier);
+    }
+
+    pub async fn validate_identity(
+        &self,
+        voting_criteria: &VotingCriteria,
+        passport: RarimePassport,
+    ) -> Result<(), RarimeError> {
+        let passport_info = self.get_passport_info(&passport).await?;
+
+        if u64::from_str(&voting_criteria.timestamp_upperbound)?
+            < passport_info.identityInfo_.issueTimestamp
+        {
+            return Err(RarimeError::ValidationError(
+                "Timestamp creation identity is bigger then upperbound".to_string(),
+            ));
+        }
+
+        if u64::from_str(&voting_criteria.identity_count_upperbound)?
+            < passport_info.passportInfo_.identityReissueCounter
+        {
+            return Err(RarimeError::ValidationError(
+                "Identity counter is bigger then upperbound".to_string(),
+            ));
+        }
+
+        return Ok(());
     }
 }

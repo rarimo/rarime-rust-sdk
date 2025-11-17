@@ -1,4 +1,6 @@
+#![allow(unused)]
 use crate::hash_algorithm::HashAlgorithm;
+use crate::poll::VotingCriteria;
 use crate::signature_algorithm::SignatureAlgorithm;
 use crate::utils::{convert_asn1_to_pem, extract_oid_from_asn1, poseidon_hash_32_bytes};
 use crate::{QueryProofParams, RarimeError};
@@ -8,8 +10,21 @@ use contracts::StateKeeper::getPassportInfoReturn;
 use num_bigint::BigInt;
 use num_traits::{Num, One, Zero};
 use proofs::{LiteRegisterProofInput, ProofProvider, QueryProofInput};
-use simple_asn1::{ASN1Block, ASN1Class, BigUint, from_der, to_der};
+use simple_asn1::{from_der, to_der, ASN1Block, ASN1Class, BigUint};
+use std::str::FromStr;
 use std::vec;
+
+#[derive(Debug, Clone)]
+pub struct MRZData {
+    document_type: String,
+    issuing_country: String,
+    document_number: String,
+    birth_date: String,
+    sex: String,
+    expiry_date: String,
+    last_name: String,
+    first_name: String,
+}
 
 enum ActiveAuthKey {
     Rsa { modulus: BigInt, exponent: BigInt },
@@ -1005,8 +1020,82 @@ impl RarimePassport {
         }
     }
 
-    pub fn get_citizenship(&self, mrz_string: String) -> Result<String, RarimeError> {
-        let result = mrz_string[2..5].to_string();
-        return Ok(result);
+    fn parse_mrz_string(&self, mrz_string: &String) -> Result<MRZData, RarimeError> {
+        let document_type = mrz_string[0..2].to_string();
+        let issuing_country = mrz_string[2..5].to_string();
+        let document_number = mrz_string[5..14].to_string();
+
+        let birth_date = mrz_string[30..36].to_string();
+        let sex = mrz_string.chars().nth(37).unwrap().to_string();
+        let expiry_date = mrz_string[38..44].to_string();
+
+        let names: Vec<&str> = mrz_string[60..].split("<<").collect();
+        let last_name = names.get(0).unwrap_or(&"").to_string();
+        let first_name = names.get(1).unwrap_or(&"").to_string();
+
+        Ok(MRZData {
+            document_type,
+            issuing_country,
+            document_number,
+            birth_date,
+            sex,
+            expiry_date,
+            last_name,
+            first_name,
+        })
+    }
+
+    pub fn get_mrz_date(&self) -> Result<MRZData, RarimeError> {
+        let mrz_string = self.get_mrz_string()?;
+        let mrz_data = self.parse_mrz_string(&mrz_string)?;
+
+        return Ok(mrz_data);
+    }
+
+    pub fn validate(&self, criteria: &VotingCriteria) -> Result<(), RarimeError> {
+        let mrz_data = self.get_mrz_date()?;
+
+        if !criteria.citizenship_whitelist.is_empty()
+            && !criteria
+            .citizenship_whitelist
+            .contains(&BigUint::from_bytes_be(&mrz_data.issuing_country.as_bytes()).to_string())
+        {
+            return Err(RarimeError::ValidationError(
+                "Citizen is not in whitelist".to_string(),
+            ));
+        }
+
+        if criteria.sex != "0" && mrz_data.sex != criteria.sex {
+            return Err(RarimeError::ValidationError("Sex mismatch".to_string()));
+        }
+
+        if criteria.birth_date_lowerbound != "52983525027888"
+            && BigUint::from_str(&criteria.birth_date_lowerbound)?
+            > BigUint::from_bytes_be(&mrz_data.birth_date.as_bytes())
+        {
+            return Err(RarimeError::ValidationError(
+                "Birth date is lover then lowerbound".to_string(),
+            ));
+        }
+
+        if criteria.birth_date_upperbound != "52983525027888"
+            && BigUint::from_str(&criteria.birth_date_upperbound)?
+            < BigUint::from_bytes_be(&mrz_data.birth_date.as_bytes())
+        {
+            return Err(RarimeError::ValidationError(
+                "Birth date is higher then upperbound".to_string(),
+            ));
+        }
+
+        if criteria.expiration_date_lowerbound != "52983525027888"
+            && BigUint::from_str(&criteria.expiration_date_lowerbound)?
+            > BigUint::from_bytes_be(&mrz_data.expiry_date.as_bytes())
+        {
+            return Err(RarimeError::ValidationError(
+                "Expiration date is higher then upperbound".to_string(),
+            ));
+        }
+
+        return Ok(());
     }
 }

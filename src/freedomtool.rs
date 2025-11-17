@@ -1,21 +1,20 @@
-use crate::poll::{ProposalData, Question};
+use crate::poll::{ProposalData, Question, VotingCriteria};
 use crate::rarime::Rarime;
-use crate::utils::{calculate_event_nullifier, vec_u8_to_u8_32};
-use crate::{QueryProofParams, RarimeError, RarimePassport, VotingCriteria};
+use crate::{QueryProofParams, RarimeError, RarimePassport};
 pub use api::types::ipfs_voting::IPFSResponseData;
 use api::types::relayer_send_transaction::{
     SendTransactionAttributes, SendTransactionData, SendTransactionRequest, SendTransactionResponse,
 };
 use api::{ApiProvider, IPFSApiProvider};
 use chrono::Utc;
-use contracts::ContractCallConfig;
-use contracts::IdCardVoting::executeTD1NoirCall;
-use contracts::ProposalsState::ProposalInfo;
 use contracts::call_data_builder::{CallDataBuilder, UserData, UserPayloadInputs};
 use contracts::contract::id_card_voting::IdCardVotingContract;
 use contracts::contract::poseidon_smt::PoseidonSmtContract;
 use contracts::contract::proposals_state::ProposalStateContract;
 use contracts::utils::{calculate_voting_event_data, u256_from_string};
+use contracts::ContractCallConfig;
+use contracts::IdCardVoting::executeTD1NoirCall;
+use contracts::ProposalsState::ProposalInfo;
 use num_bigint::BigUint;
 use std::str::FromStr;
 
@@ -114,9 +113,32 @@ impl Freedomtool {
         Ok(proposal_data)
     }
 
+    pub async fn validate(
+        &self,
+        passport: RarimePassport,
+        rarime: Rarime,
+        poll_data: ProposalData,
+    ) -> Result<(), RarimeError> {
+        passport.validate(&poll_data.criteria)?;
+
+        rarime
+            .validate_identity(&poll_data.criteria, passport)
+            .await?;
+
+        let already_voted = self.is_already_voted(rarime, poll_data).await?;
+
+        if already_voted {
+            return Err(RarimeError::ValidationError(
+                "User is already voted".to_string(),
+            ));
+        }
+
+        return Ok(());
+    }
+
     pub async fn is_already_voted(
         &self,
-        private_key: Vec<u8>,
+        rarime: Rarime,
         poll_data: ProposalData,
     ) -> Result<bool, RarimeError> {
         let proposal_state_config = ContractCallConfig {
@@ -141,12 +163,7 @@ impl Freedomtool {
 
         let poseidon_smt = PoseidonSmtContract::new(proposal_smt_call_config);
 
-        let private_key_u8_32 = vec_u8_to_u8_32(&private_key)?;
-
-        let nullifier = calculate_event_nullifier(
-            &vec_u8_to_u8_32(&event_id.to_be_bytes_vec())?,
-            &private_key_u8_32,
-        )?;
+        let nullifier = rarime.calculate_event_nullifier(event_id.to_string())?;
 
         let smt_proof = poseidon_smt.get_proof_call(&nullifier).await?;
 
@@ -289,6 +306,9 @@ impl Freedomtool {
         rarime: Rarime,
         passport: RarimePassport,
     ) -> Result<String, RarimeError> {
+        self.validate(passport.clone(), rarime.clone(), poll_data.clone())
+            .await?;
+
         let query_proof_params = self
             .build_vote_proof_inputs(
                 poll_data.criteria.clone(),
