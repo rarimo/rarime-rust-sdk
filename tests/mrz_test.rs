@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use base64::engine::general_purpose::STANDARD;
     use base64::Engine;
+    use base64::engine::general_purpose::STANDARD;
 
     use rarime_rust_sdk::RarimePassport;
     use serde_json::Value;
@@ -28,7 +28,7 @@ mod tests {
                 .unwrap(),
         };
 
-        let mrz_date = passport.get_mrz_date().unwrap();
+        let mrz_date = passport.get_mrz_td1_data().unwrap();
 
         dbg!(&mrz_date);
     }

@@ -10,7 +10,7 @@ use contracts::StateKeeper::getPassportInfoReturn;
 use num_bigint::BigInt;
 use num_traits::{Num, One, Zero};
 use proofs::{LiteRegisterProofInput, ProofProvider, QueryProofInput};
-use simple_asn1::{from_der, to_der, ASN1Block, ASN1Class, BigUint};
+use simple_asn1::{ASN1Block, ASN1Class, BigUint, from_der, to_der};
 use std::str::FromStr;
 use std::vec;
 
@@ -1045,7 +1045,7 @@ impl RarimePassport {
         })
     }
 
-    pub fn get_mrz_date(&self) -> Result<MRZData, RarimeError> {
+    pub fn get_mrz_td1_data(&self) -> Result<MRZData, RarimeError> {
         let mrz_string = self.get_mrz_string()?;
         let mrz_data = self.parse_mrz_string(&mrz_string)?;
 
@@ -1053,12 +1053,12 @@ impl RarimePassport {
     }
 
     pub fn validate(&self, criteria: &VotingCriteria) -> Result<(), RarimeError> {
-        let mrz_data = self.get_mrz_date()?;
+        let mrz_data = self.get_mrz_td1_data()?;
 
         if !criteria.citizenship_whitelist.is_empty()
             && !criteria
-            .citizenship_whitelist
-            .contains(&BigUint::from_bytes_be(&mrz_data.issuing_country.as_bytes()).to_string())
+                .citizenship_whitelist
+                .contains(&BigUint::from_bytes_be(&mrz_data.issuing_country.as_bytes()).to_string())
         {
             return Err(RarimeError::ValidationError(
                 "Citizen is not in whitelist".to_string(),
@@ -1071,7 +1071,7 @@ impl RarimePassport {
 
         if criteria.birth_date_lowerbound != "52983525027888"
             && BigUint::from_str(&criteria.birth_date_lowerbound)?
-            > BigUint::from_bytes_be(&mrz_data.birth_date.as_bytes())
+                > BigUint::from_bytes_be(&mrz_data.birth_date.as_bytes())
         {
             return Err(RarimeError::ValidationError(
                 "Birth date is lover then lowerbound".to_string(),
@@ -1080,7 +1080,7 @@ impl RarimePassport {
 
         if criteria.birth_date_upperbound != "52983525027888"
             && BigUint::from_str(&criteria.birth_date_upperbound)?
-            < BigUint::from_bytes_be(&mrz_data.birth_date.as_bytes())
+                < BigUint::from_bytes_be(&mrz_data.birth_date.as_bytes())
         {
             return Err(RarimeError::ValidationError(
                 "Birth date is higher then upperbound".to_string(),
@@ -1089,7 +1089,7 @@ impl RarimePassport {
 
         if criteria.expiration_date_lowerbound != "52983525027888"
             && BigUint::from_str(&criteria.expiration_date_lowerbound)?
-            > BigUint::from_bytes_be(&mrz_data.expiry_date.as_bytes())
+                > BigUint::from_bytes_be(&mrz_data.expiry_date.as_bytes())
         {
             return Err(RarimeError::ValidationError(
                 "Expiration date is higher then upperbound".to_string(),
