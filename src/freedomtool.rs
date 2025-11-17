@@ -1,7 +1,8 @@
+use crate::poll::{ProposalData, Question};
 use crate::rarime::Rarime;
 use crate::utils::{calculate_event_nullifier, vec_u8_to_u8_32};
 use crate::{QueryProofParams, RarimeError, RarimePassport, VotingCriteria};
-use api::types::ipfs_voting::IPFSResponseData;
+pub use api::types::ipfs_voting::IPFSResponseData;
 use api::types::relayer_send_transaction::{
     SendTransactionAttributes, SendTransactionData, SendTransactionRequest, SendTransactionResponse,
 };
@@ -45,9 +46,47 @@ impl Freedomtool {
         return Self { config };
     }
 
-    /// This function returns data in JSON string format.
-    /// Make sure to parse it before using the result.
-    pub async fn get_polls_data_ipfs(
+    pub async fn get_proposal_data(&self, poll_id: String) -> Result<ProposalData, RarimeError> {
+        let proposal_data_contract = self.get_polls_data_contract(poll_id.clone()).await?;
+
+        let proposal_data = self
+            .get_polls_data_ipfs(proposal_data_contract.config.description)
+            .await?;
+
+        let voting_address = proposal_data_contract.config.votingWhitelist[0].to_string();
+
+        let proposal_rules = self
+            .get_proposal_rules(poll_id.clone(), voting_address.clone())
+            .await?;
+
+        let proposal_data = ProposalData {
+            poll_id: poll_id,
+            proposal_smt_address: proposal_data_contract.proposalSMT.to_string(),
+            criteria: proposal_rules,
+            status: proposal_data_contract.status,
+            start_timestamp: proposal_data_contract.config.startTimestamp,
+            poll_duration: proposal_data_contract.config.duration,
+            image_cid: proposal_data.image_cid,
+            send_vote_contract_address: voting_address,
+            title: proposal_data.title,
+            description: proposal_data.description,
+            questions: proposal_data
+                .accepted_options
+                .into_iter()
+                .map(Question::from)
+                .collect(),
+            ranking_based: None,
+            voting_results: proposal_data_contract
+                .votingResults
+                .into_iter()
+                .map(|arr| arr.iter().map(|u| u.to_string()).collect())
+                .collect(),
+        };
+
+        return Ok(proposal_data);
+    }
+
+    async fn get_polls_data_ipfs(
         &self,
         ipfs_index: String,
     ) -> Result<IPFSResponseData, RarimeError> {
@@ -55,15 +94,10 @@ impl Freedomtool {
 
         let proposal_data = ipfs_provider.get_proposal_data(&ipfs_index).await?;
 
-        //let result = proposal_data
-
         return Ok(proposal_data);
     }
 
-    pub async fn get_polls_data_contract(
-        &self,
-        poll_id: String,
-    ) -> Result<ProposalInfo, RarimeError> {
+    async fn get_polls_data_contract(&self, poll_id: String) -> Result<ProposalInfo, RarimeError> {
         let contract_call_config = ContractCallConfig {
             contract_address: self
                 .config
@@ -83,26 +117,43 @@ impl Freedomtool {
     pub async fn is_already_voted(
         &self,
         private_key: Vec<u8>,
-        event_id: Vec<u8>,
-        proposal_smt_address: String,
+        poll_data: ProposalData,
     ) -> Result<bool, RarimeError> {
+        let proposal_state_config = ContractCallConfig {
+            contract_address: self
+                .config
+                .contracts_configuration
+                .proposals_state_address
+                .clone(),
+            rpc_url: self.config.api_configuration.voting_rpc_url.clone(),
+        };
+
+        let proposal_state = ProposalStateContract::new(proposal_state_config);
+
+        let event_id = proposal_state
+            .get_event_id(&poll_data.poll_id.clone())
+            .await?;
+
         let proposal_smt_call_config = ContractCallConfig {
             rpc_url: self.config.api_configuration.voting_rpc_url.clone(),
-            contract_address: proposal_smt_address,
+            contract_address: poll_data.proposal_smt_address.clone(),
         };
 
         let poseidon_smt = PoseidonSmtContract::new(proposal_smt_call_config);
 
         let private_key_u8_32 = vec_u8_to_u8_32(&private_key)?;
 
-        let nullifier =
-            calculate_event_nullifier(&vec_u8_to_u8_32(&event_id)?, &private_key_u8_32)?;
+        let nullifier = calculate_event_nullifier(
+            &vec_u8_to_u8_32(&event_id.to_be_bytes_vec())?,
+            &private_key_u8_32,
+        )?;
+
         let smt_proof = poseidon_smt.get_proof_call(&nullifier).await?;
 
         return Ok(smt_proof.existence);
     }
 
-    pub async fn get_proposal_rules(
+    async fn get_proposal_rules(
         &self,
         proposal_id: String,
         id_card_voting_address: String,
@@ -230,17 +281,22 @@ impl Freedomtool {
         return Ok(call_data);
     }
 
+    /// return transaction hash only
     pub async fn send_vote(
         &self,
         answers: Vec<u8>,
-        voting_criteria: VotingCriteria,
+        poll_data: ProposalData,
         rarime: Rarime,
         passport: RarimePassport,
-        contract_voting_address: String,
-        proposal_id: String,
-    ) -> Result<SendTransactionResponse, RarimeError> {
+    ) -> Result<String, RarimeError> {
         let query_proof_params = self
-            .build_vote_proof_inputs(voting_criteria, &proposal_id, &rarime, &passport, &answers)
+            .build_vote_proof_inputs(
+                poll_data.criteria.clone(),
+                &poll_data.poll_id,
+                &rarime,
+                &passport,
+                &answers,
+            )
             .await?;
 
         let query_proof = rarime
@@ -250,7 +306,7 @@ impl Freedomtool {
         let call_data = self
             .build_vote_call_data(
                 query_proof_params.event_id,
-                proposal_id,
+                poll_data.poll_id.clone(),
                 answers,
                 rarime,
                 passport,
@@ -258,11 +314,13 @@ impl Freedomtool {
             )
             .await?;
 
-        let result = self
-            .send_vote_transaction(&call_data, contract_voting_address)
+        let send_transaction = self
+            .send_vote_transaction(&call_data, poll_data.send_vote_contract_address.clone())
             .await?;
 
-        return Ok(result);
+        let tx_hash = send_transaction.data.id;
+
+        return Ok(tx_hash);
     }
 
     async fn send_vote_transaction(
