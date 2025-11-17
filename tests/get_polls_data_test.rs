@@ -6,7 +6,7 @@ mod tests {
     };
 
     #[tokio::test]
-    async fn get_poll_data_test_ipfs() {
+    async fn get_poll_data_test() {
         let freedomtool_config = FreedomtoolConfiguration {
             contracts_configuration: FreedomtoolContractsConfiguration {
                 proposals_state_address: "0x4C61d7454653720DAb9e26Ca25dc7B8a5cf7065b".to_string(),

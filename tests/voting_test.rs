@@ -31,25 +31,7 @@ mod tests {
 
         let proposal_id: String = "217".to_string();
 
-        let proposal_data_contract = freedomtool
-            .get_polls_data_contract(proposal_id.clone())
-            .await
-            .unwrap();
-
-        let proposal_data = freedomtool
-            .get_polls_data_ipfs(proposal_data_contract.config.description)
-            .await
-            .unwrap();
-
-        let answers = vec![1];
-
-        let proposal_criteria = freedomtool
-            .get_proposal_rules(
-                proposal_id.clone(),
-                proposal_data_contract.config.votingWhitelist[0].to_string(),
-            )
-            .await
-            .unwrap();
+        let poll_data = freedomtool.get_proposal_data(proposal_id).await.unwrap();
 
         let rarime_config = RarimeConfiguration {
             contracts_configuration: RarimeContractsConfiguration {
@@ -90,18 +72,13 @@ mod tests {
                 .unwrap(),
         };
 
+        let answers = vec![1];
+
         let result = tokio::task::spawn_blocking({
             move || {
                 futures::executor::block_on(async move {
                     freedomtool
-                        .send_vote(
-                            answers,
-                            proposal_criteria,
-                            rarime,
-                            passport,
-                            proposal_data_contract.config.votingWhitelist[0].to_string(),
-                            proposal_id,
-                        )
+                        .send_vote(answers, poll_data, rarime, passport)
                         .await
                 })
             }
