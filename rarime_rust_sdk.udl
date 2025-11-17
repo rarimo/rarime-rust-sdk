@@ -28,6 +28,8 @@ enum RarimeError {
     "ProfileKeyError",
     "SetupSDKError",
     "ParseBigIntError",
+    "ParseIntError",
+    "ValidationError"
 };
 
 enum DocumentStatus {
@@ -171,7 +173,8 @@ interface Freedomtool {
     boolean is_already_voted(sequence<u8> private_key, ProposalData poll_data);
     [Async,Throws=RarimeError]
     string send_vote(sequence<u8> answers, ProposalData poll_data, Rarime rarime, RarimePassport passport);
-
+    [Async,Throws=RarimeError]
+    void validate(RarimePassport passport, Rarime rarime, ProposalData poll_data);
 };
 
 
