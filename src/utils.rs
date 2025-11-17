@@ -1,18 +1,18 @@
 use crate::RarimeError;
 use crate::RarimeError::PoseidonHashError;
-use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
 use const_oid::ObjectIdentifier;
 use ff::{PrimeField, PrimeFieldRepr};
 use num_bigint::{BigInt, Sign};
 use num_traits::Zero;
 use poseidon_rs::{Fr, FrRepr};
-use simple_asn1::{ASN1Block, to_der};
+use simple_asn1::{to_der, ASN1Block};
 use std::io::Cursor;
 
 pub mod rarime_utils {
-    use crate::RarimeError;
     use crate::utils::poseidon_hash_32_bytes;
+    use crate::RarimeError;
     use babyjubjub_rs::new_key;
     use ff::{PrimeField, PrimeFieldRepr};
     use num_bigint::BigInt;
@@ -168,22 +168,4 @@ pub fn get_smt_proof_index(
     return Ok(result);
 }
 
-pub fn calculate_event_nullifier(
-    event_id: &[u8; 32],
-    private_key: &[u8; 32],
-) -> Result<[u8; 32], RarimeError> {
-    let private_key_big_int = BigInt::from_bytes_be(Sign::Plus, private_key);
 
-    let secret_key_hash = poseidon_hash_32_bytes(&vec![private_key_big_int.clone()])?;
-    let secret_key_hash_big_int = BigInt::from_bytes_be(Sign::Plus, secret_key_hash.as_slice());
-
-    let event_id_big_int = BigInt::from_bytes_be(Sign::Plus, event_id);
-
-    let event_nullifier = poseidon_hash_32_bytes(&vec![
-        private_key_big_int,
-        secret_key_hash_big_int,
-        event_id_big_int,
-    ])?;
-
-    return Ok(event_nullifier);
-}
