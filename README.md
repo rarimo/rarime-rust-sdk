@@ -6,6 +6,8 @@ Our mission is to provide developers with a **single, reliable, and high-perform
 Rarimo ecosystem on any platform.  
 The SDK is completely **free**, **open-source**, and **community-driven**.
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/rarimo/rarime-rust-sdk)
+
 ---
 
 ## ✨ Key Features
@@ -126,7 +128,6 @@ We support two chains:
 ## 🚀 Example Usage
 
 ```Kotlin
-
     ///Setup utils
     val utils = RarimeUtils()
 
@@ -209,7 +210,8 @@ We support two chains:
      */
     val queryProf = runBlocking {
         rarime.generateQueryProof(
-            passport = passport, queryParams = queryProofParams
+            passport = passport,
+            queryParams = queryProofParams
         )
     }
 
