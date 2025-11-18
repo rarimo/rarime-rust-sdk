@@ -8,6 +8,15 @@ Start by downloading the official Clang `.dmg` and attempting a standard install
 - If an error occurs due to macOS version restrictions, follow the steps below to modify the installer and complete the
   installation successfully.
 
+> **Note:** Please ensure you are exclusively utilizing the official Apple Clang toolchain installed via associated
+> Command Line Tools.
+>
+> DO NOT attempt to use any third-party or custom compiler installations, such as those provided by package managers
+> like Homebrew.
+>
+>Using alternative toolchains will result in unexpected build failures, linker errors, and dependency incompatibilities.
+> Use only Apple Clang.
+
 # Installing Standalone Clang on macOS (When the Default Installer Fails)
 
 If you encounter issues installing **Standalone Clang** due to macOS version restrictions, you can manually adjust the
