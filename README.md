@@ -143,7 +143,7 @@ We support two chains:
     )
 
     val confContract = RarimeContractsConfiguration(
-        stateKeeperContractAddress = "<STATE_KEEPER_CONTRACT_ADDRESS>",
+        stateKeeperAddress = "<STATE_KEEPER_CONTRACT_ADDRESS>",
         registerContractAddress = "<REGISTER_CONTRACT_ADDRESS>",
         poseidonSmtAddress = "<POSEIDON_SMT_ADDRESS>"
     )
@@ -254,7 +254,7 @@ We support two chains:
      */
     val isVoted = runBlocking {
         freedomtool.isAlreadyVoted(
-            privateKey = userPrivateKey,
+            rarime = rarime,
             pollData = proposal_data
         )
     }
