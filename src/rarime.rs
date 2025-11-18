@@ -1,20 +1,20 @@
 use crate::utils::{get_smt_proof_index, poseidon_hash_32_bytes, vec_u8_to_u8_32};
-use crate::{rarime_utils, DocumentStatus, QueryProofParams, RarimeError, RarimePassport};
+use crate::{DocumentStatus, QueryProofParams, RarimeError, RarimePassport, rarime_utils};
+use api::ApiProvider;
 use api::types::relayer_light_register::{LiteRegisterData, LiteRegisterRequest};
 use api::types::verify_sod::{Attributes, Data, DocumentSod, VerifySodRequest, VerifySodResponse};
-use api::ApiProvider;
-use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
+use contracts::ContractCallConfig;
 use contracts::call_data_builder::CallDataBuilder;
 use contracts::contract::poseidon_smt::PoseidonSmtContract;
 use contracts::contract::state_keeper::StateKeeperContract;
 use contracts::utils::convert_to_u256;
-use contracts::ContractCallConfig;
 use std::str::FromStr;
 
 use crate::poll::VotingCriteria;
 use crate::rarimo_utils::RarimeUtils;
-use contracts::RegistrationSimple::{registerSimpleViaNoirCall, Passport};
+use contracts::RegistrationSimple::{Passport, registerSimpleViaNoirCall};
 use contracts::SparseMerkleTree::Proof;
 use contracts::StateKeeper::getPassportInfoReturn;
 use num_bigint::{BigInt, Sign};
@@ -131,10 +131,13 @@ impl Rarime {
         proof: &[u8],
     ) -> Result<Vec<u8>, RarimeError> {
         let public_key: [u8; 32] =
-            hex::decode(&verify_sod_response.data.attributes.public_key[2..])
-                .expect("Invalid hex string")[..32]
+            hex::decode(&verify_sod_response.data.attributes.public_key[2..])?[..32]
                 .try_into()
-                .expect("slice with incorrect length");
+                .map_err(|_| {
+                    RarimeError::VectorSizeValidationError(
+                        "Vector must be 32 bytes in length".to_string(),
+                    )
+                })?;
 
         let call_data_builder = CallDataBuilder::new();
         let inputs = registerSimpleViaNoirCall {
@@ -143,16 +146,12 @@ impl Rarime {
                     .get_profile_key(self.config.user_configuration.user_private_key.clone())?,
             )?)?,
             passport_: Passport {
-                dgCommit: convert_to_u256(
-                    &proof[..32]
-                        .try_into()
-                        .expect("proof with incorrect length (length < 32)"),
-                )?,
-                dg1Hash: convert_to_u256(
-                    &proof[32..64]
-                        .try_into()
-                        .expect("proof with incorrect length (length < 64)"),
-                )?
+                dgCommit: convert_to_u256(&proof[..32].try_into().map_err(|_| {
+                    RarimeError::VectorSizeValidationError("Proof length less than 32".to_string())
+                })?)?,
+                dg1Hash: convert_to_u256(&proof[32..64].try_into().map_err(|_| {
+                    RarimeError::VectorSizeValidationError("Proof length less than 64".to_string())
+                })?)?
                 .into(),
                 publicKey: public_key.into(),
                 passportHash: passport.get_passport_hash()?.into(),
@@ -167,7 +166,11 @@ impl Rarime {
                 )?
                 .as_slice()
                 .try_into()
-                .expect("Expected a 20-byte slice as verifier address"),
+                .map_err(|_| {
+                    RarimeError::VectorSizeValidationError(
+                        "Verifier address is not 20 length".to_string(),
+                    )
+                })?,
             },
             signature_: hex::decode(&verify_sod_response.data.attributes.signature[2..])?.into(),
             // Remove public signals from the proof
@@ -281,7 +284,7 @@ impl Rarime {
         let profile_key = vec_u8_to_u8_32(&utils.get_profile_key(pk_key.to_vec())?)?;
 
         if profile_key != passport_info.passportInfo_.activeIdentity {
-            return Err(RarimeError::ProfileKeyError(format!(
+            return Err(RarimeError::VectorSizeValidationError(format!(
                 "profile key mismatch. profile_key = {},   passport_info.passportInfo_.activeIdentity= {}",
                 hex::encode(profile_key),
                 hex::encode(passport_info.passportInfo_.activeIdentity)

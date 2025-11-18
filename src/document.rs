@@ -594,7 +594,13 @@ impl RarimePassport {
                     && let Ok(parsed) = from_der(raw_bytes)
                 {
                     return if parsed.len() == 1 {
-                        Some(parsed.into_iter().next().expect("ASN1 parser returned an empty list when exactly one item was expected."))
+                        Some(
+                            parsed
+                                .into_iter()
+                                .next()
+                                .ok_or("ASN1 parser returned an empty list when exactly one item was expected.")
+                                .ok()?
+                        )
                     } else {
                         Some(ASN1Block::Sequence(parsed.len(), parsed))
                     };
@@ -1026,12 +1032,16 @@ impl RarimePassport {
         let document_number = mrz_string[5..14].to_string();
 
         let birth_date = mrz_string[30..36].to_string();
-        let sex = mrz_string.chars().nth(37).unwrap().to_string();
+        let sex = mrz_string
+            .chars()
+            .nth(37)
+            .ok_or_else(|| RarimeError::ValidationError("Fail extract sex from mrz".to_string()))?
+            .to_string();
         let expiry_date = mrz_string[38..44].to_string();
 
         let names: Vec<&str> = mrz_string[60..].split("<<").collect();
-        let last_name = names.get(0).unwrap_or(&"").to_string();
-        let first_name = names.get(1).unwrap_or(&"").to_string();
+        let last_name = names.get(0).map_or(String::new(), |s| s.to_string());
+        let first_name = names.get(1).map_or(String::new(), |s| s.to_string());
 
         Ok(MRZData {
             document_type,

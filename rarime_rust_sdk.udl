@@ -29,7 +29,9 @@ enum RarimeError {
     "SetupSDKError",
     "ParseBigIntError",
     "ParseIntError",
-    "ValidationError"
+    "ValidationError",
+    "SetupGeneratorPointError",
+    "PrimeFieldConvertingError",
 };
 
 enum DocumentStatus {

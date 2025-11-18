@@ -60,7 +60,7 @@ pub enum RarimeError {
     #[error("Decode hex error: {0}")]
     DecodeHexError(#[from] FromHexError),
     #[error("Profile key error: {0}")]
-    ProfileKeyError(String),
+    VectorSizeValidationError(String),
     #[error("Setup SDK process error: {0}")]
     SetupSDKError(String),
     #[error("Failed parse bigint error: {0}")]
@@ -69,4 +69,8 @@ pub enum RarimeError {
     ParseIntError(#[from] ParseIntError),
     #[error("Failed parse bigint error: {0}")]
     ValidationError(String),
+    #[error("Failed to setup generator point : {0}")]
+    SetupGeneratorPointError(String),
+    #[error("Prime field converting error : {0}")]
+    PrimeFieldConvertingError(String),
 }

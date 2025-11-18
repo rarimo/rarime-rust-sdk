@@ -1,18 +1,18 @@
 use crate::RarimeError;
 use crate::RarimeError::PoseidonHashError;
-use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use const_oid::ObjectIdentifier;
 use ff::{PrimeField, PrimeFieldRepr};
 use num_bigint::{BigInt, Sign};
 use num_traits::Zero;
 use poseidon_rs::{Fr, FrRepr};
-use simple_asn1::{to_der, ASN1Block};
+use simple_asn1::{ASN1Block, to_der};
 use std::io::Cursor;
 
 pub mod rarime_utils {
-    use crate::utils::poseidon_hash_32_bytes;
     use crate::RarimeError;
+    use crate::utils::poseidon_hash_32_bytes;
     use babyjubjub_rs::new_key;
     use ff::{PrimeField, PrimeFieldRepr};
     use num_bigint::BigInt;
@@ -37,25 +37,31 @@ pub mod rarime_utils {
             x: babyjubjub_rs::Fr::from_str(
                 "5299619240641551281634865583518297030282874472190772894086521144482721001553",
             )
-            .expect("Failed to init Generator point"),
+            .ok_or(RarimeError::SetupGeneratorPointError(
+                "Failed to init Generator point X".to_string(),
+            ))?,
             y: babyjubjub_rs::Fr::from_str(
                 "16950150798460657717958625567821834550301663161624707787222815936182638968203",
             )
-            .expect("Failed to init Generator point"),
+            .ok_or(RarimeError::SetupGeneratorPointError(
+                "Failed to init Generator point Y".to_string(),
+            ))?,
         };
         let pub_point = b8.mul_scalar(&scalar_int);
         let mut x_raw_bytes = Vec::new();
         let x_raw = pub_point.x.into_repr();
-        x_raw
-            .write_be(&mut x_raw_bytes)
-            .expect("Error converting repr to bytes");
+        x_raw.write_be(&mut x_raw_bytes).map_err(|e| {
+            RarimeError::SetupGeneratorPointError(format!("Error converting repr to byte: {}", e))
+        })?;
+
         let x_big_int = BigInt::from_bytes_be(num_bigint::Sign::Plus, &x_raw_bytes);
 
         let mut y_raw_bytes = Vec::new();
         let y_raw = pub_point.y.into_repr();
-        y_raw
-            .write_be(&mut y_raw_bytes)
-            .expect("Error converting repr to bytes");
+        y_raw.write_be(&mut y_raw_bytes).map_err(|e| {
+            RarimeError::SetupGeneratorPointError(format!("Error converting repr to byte: {}", e))
+        })?;
+
         let y_big_int = BigInt::from_bytes_be(num_bigint::Sign::Plus, &y_raw_bytes);
 
         let profile_key = poseidon_hash_32_bytes(&vec![x_big_int, y_big_int])?;
@@ -84,28 +90,38 @@ pub fn big_int_to_32_bytes(num: &BigInt) -> [u8; 32] {
 
 pub fn poseidon_hash_32_bytes(vec_big_int: &[BigInt]) -> Result<[u8; 32], RarimeError> {
     let poseidon = poseidon_rs::Poseidon::new();
-    let vec_fr: Vec<Fr> = vec_big_int
+    let vec_fr: Result<Vec<Fr>, RarimeError> = vec_big_int
         .iter()
-        .map(|big_int| {
+        .map(|big_int| -> Result<Fr, RarimeError> {
             let bytes = big_int_to_32_bytes(big_int);
-
             let mut repr = FrRepr::default();
-
             let mut cursor = Cursor::new(&bytes);
-            repr.read_be(&mut cursor)
-                .expect("error convert BigInt to Fr ");
 
-            Fr::from_repr(repr).expect("error converting Repr to Fr")
+            repr.read_be(&mut cursor).map_err(|e| {
+                RarimeError::PrimeFieldConvertingError(format!("Error convert BigInt to Fr: {}", e))
+            })?;
+
+            let fr = Fr::from_repr(repr).map_err(|e| {
+                RarimeError::PrimeFieldConvertingError(format!(
+                    "Error converting Repr to Fr: {}",
+                    e
+                ))
+            })?;
+
+            Ok(fr)
         })
         .collect();
+
+    let vec_fr = vec_fr?;
     let hash_result: Fr = poseidon.hash(vec_fr).map_err(PoseidonHashError)?;
 
     let repr = hash_result.into_repr();
 
     let mut raw_hash_bytes = Vec::new();
 
-    repr.write_be(&mut raw_hash_bytes)
-        .expect("Error converting repr to bytes");
+    repr.write_be(&mut raw_hash_bytes).map_err(|e| {
+        RarimeError::PrimeFieldConvertingError(format!("Error converting repr to byte: {}", e))
+    })?;
 
     let result_big_int = BigInt::from_bytes_be(Sign::Plus, &raw_hash_bytes);
 
@@ -151,7 +167,7 @@ pub fn convert_asn1_to_pem(asn1_block: &ASN1Block) -> Result<String, RarimeError
 
 pub fn vec_u8_to_u8_32(vec: &Vec<u8>) -> Result<[u8; 32], RarimeError> {
     let result: [u8; 32] = vec.as_slice().try_into().map_err(|_| {
-        RarimeError::ProfileKeyError("Private key must be 32 bytes in length.".to_string())
+        RarimeError::VectorSizeValidationError("Vector must be 32 bytes in length.".to_string())
     })?;
     return Ok(result);
 }
@@ -167,5 +183,3 @@ pub fn get_smt_proof_index(
 
     return Ok(result);
 }
-
-
