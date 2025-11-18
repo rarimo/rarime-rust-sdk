@@ -25,7 +25,7 @@ enum RarimeError {
     "ProveError",
     "ApiError",
     "DecodeHexError",
-    "ProfileKeyError",
+    "VectorSizeValidationError",
     "SetupSDKError",
     "ParseBigIntError",
     "ParseIntError",
@@ -75,7 +75,7 @@ dictionary RarimeAPIConfiguration {
 };
 
 dictionary RarimeContractsConfiguration {
-    string state_keeper_contract_address;
+    string state_keeper_address;
     string register_contract_address;
     string poseidon_smt_address;
 };
@@ -167,16 +167,15 @@ dictionary ProposalData {
 
 
 interface Freedomtool {
-    [Throws=RarimeError]
-    constructor(FreedomtoolConfiguration config);
+constructor(FreedomtoolConfiguration config);
     [Async,Throws=RarimeError]
     ProposalData get_proposal_data(string poll_id);
     [Async,Throws=RarimeError]
-    boolean is_already_voted(sequence<u8> private_key, ProposalData poll_data);
+    boolean is_already_voted( [ByRef] Rarime rarime, ProposalData poll_data);
     [Async,Throws=RarimeError]
-    string send_vote(sequence<u8> answers, ProposalData poll_data, Rarime rarime, RarimePassport passport);
+    string send_vote(sequence<u8> answers, ProposalData poll_data, [ByRef] Rarime rarime, RarimePassport passport);
     [Async,Throws=RarimeError]
-    void validate(RarimePassport passport, Rarime rarime, ProposalData poll_data);
+    void validate(RarimePassport passport, [ByRef] Rarime rarime, ProposalData poll_data);
 };
 
 
