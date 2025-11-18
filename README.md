@@ -6,6 +6,8 @@ Our mission is to provide developers with a **single, reliable, and high-perform
 Rarimo ecosystem on any platform.  
 The SDK is completely **free**, **open-source**, and **community-driven**.
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/rarimo/rarime-rust-sdk)
+
 ---
 
 ## ✨ Key Features
@@ -126,7 +128,6 @@ We support two chains:
 ## 🚀 Example Usage
 
 ```Kotlin
-
     ///Setup utils
     val utils = RarimeUtils()
 
@@ -209,10 +210,86 @@ We support two chains:
      */
     val queryProf = runBlocking {
         rarime.generateQueryProof(
-            passport = passport, queryParams = queryProofParams
+            passport = passport,
+            queryParams = queryProofParams
         )
     }
 
+```
+
+### Freedomtool integration
+
+```Kotlin
+    val freedomtoolConfiguration = FreedomtoolConfiguration(
+        apiConfiguration = FreedomtoolApiConfiguration(
+            votingRpcUrl = "<VOTING_RPC_URL>",
+            ipfsUrl = "<IPFS_URL>",
+            relayerUrl = "<VOTING_RELAYER_URL>"
+        ),
+        contractsConfiguration = FreedomtoolContractsConfiguration(
+            proposalsStateAddress = "<PROPOSAL_STATE_CONTRACT_ADDRESS>"
+        )
+    )
+
+    val freedomtool = Freedomtool(
+        freedomtoolConfiguration
+    )
+
+    /**
+     * This ID you may parse from QR-code uri
+     */
+    val proposalID = 212
+
+    /**
+     * Return data about proposal.
+     * Can used for saving and display
+     */
+    val proposal_data = runBlocking { 
+    freedomtool.getProposalData(proposalID.toString()) 
+    }
+
+
+    /**
+     * Return true if user is already voted in this Proposal
+     */
+    val isVoted = runBlocking {
+        freedomtool.isAlreadyVoted(
+            privateKey = userPrivateKey,
+            pollData = proposal_data
+        )
+    }
+
+   /**
+    * Return an error if the user is not eligible to vote on the proposal
+    */
+    runBlocking {
+        freedomtool.validate(
+            passport = passport,
+            rarime = rarime,
+            pollData = proposal_data
+        )
+    }
+
+
+   /**
+    * Example of user vote result
+    */
+    val vote: List<UByte> = listOf(1U)
+
+
+   /**
+    * Function for send vote.
+    *
+    * return transaction hash
+    */
+    val sendVote = runBlocking {
+        freedomtool.sendVote(
+            answers = vote,
+            pollData = proposal_data,
+            rarime = rarime,
+            passport = passport
+        )
+    }
 ```
 
 ---
