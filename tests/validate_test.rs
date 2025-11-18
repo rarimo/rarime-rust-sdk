@@ -1,7 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use base64::engine::general_purpose::STANDARD;
     use base64::Engine;
+    use base64::engine::general_purpose::STANDARD;
+    use rarime_rust_sdk::RarimePassport;
     use rarime_rust_sdk::freedomtool::{
         Freedomtool, FreedomtoolAPIConfiguration, FreedomtoolConfiguration,
         FreedomtoolContractsConfiguration,
@@ -10,7 +11,6 @@ mod tests {
         Rarime, RarimeAPIConfiguration, RarimeConfiguration, RarimeContractsConfiguration,
         RarimeUserConfiguration,
     };
-    use rarime_rust_sdk::RarimePassport;
     use serde_json::Value;
     use std::fs;
 
@@ -65,14 +65,14 @@ mod tests {
                 user_private_key: hex::decode(
                     "090ad31e17fa6d91dd575249db8e721262f988eac3bfe9b4d5366415a7995865",
                 )
-                    .unwrap(),
+                .unwrap(),
             },
         };
 
         let rarime = Rarime::new(rarime_config).unwrap();
 
         let validation_result = freedomtool
-            .validate(passport, rarime, poll_data)
+            .validate(passport, &rarime, poll_data)
             .await
             .unwrap();
 
