@@ -7,14 +7,14 @@ use api::types::relayer_send_transaction::{
 };
 use api::{ApiProvider, IPFSApiProvider};
 use chrono::Utc;
+use contracts::ContractCallConfig;
+use contracts::IdCardVoting::executeTD1NoirCall;
+use contracts::ProposalsState::ProposalInfo;
 use contracts::call_data_builder::{CallDataBuilder, UserData, UserPayloadInputs};
 use contracts::contract::id_card_voting::IdCardVotingContract;
 use contracts::contract::poseidon_smt::PoseidonSmtContract;
 use contracts::contract::proposals_state::ProposalStateContract;
 use contracts::utils::{calculate_voting_event_data, u256_from_string};
-use contracts::ContractCallConfig;
-use contracts::IdCardVoting::executeTD1NoirCall;
-use contracts::ProposalsState::ProposalInfo;
 use num_bigint::BigUint;
 use std::str::FromStr;
 
@@ -36,6 +36,7 @@ pub struct FreedomtoolContractsConfiguration {
     pub proposals_state_address: String,
 }
 
+#[derive(Debug, Clone)]
 pub struct Freedomtool {
     config: FreedomtoolConfiguration,
 }
@@ -116,7 +117,7 @@ impl Freedomtool {
     pub async fn validate(
         &self,
         passport: RarimePassport,
-        rarime: Rarime,
+        rarime: &Rarime,
         poll_data: ProposalData,
     ) -> Result<(), RarimeError> {
         passport.validate(&poll_data.criteria)?;
@@ -125,7 +126,7 @@ impl Freedomtool {
             .validate_identity(&poll_data.criteria, passport)
             .await?;
 
-        let already_voted = self.is_already_voted(rarime, poll_data).await?;
+        let already_voted = self.is_already_voted(&rarime, poll_data).await?;
 
         if already_voted {
             return Err(RarimeError::ValidationError(
@@ -138,7 +139,7 @@ impl Freedomtool {
 
     pub async fn is_already_voted(
         &self,
-        rarime: Rarime,
+        rarime: &Rarime,
         poll_data: ProposalData,
     ) -> Result<bool, RarimeError> {
         let proposal_state_config = ContractCallConfig {
@@ -259,7 +260,7 @@ impl Freedomtool {
         event_id: String,
         proposal_id: String,
         answers: Vec<u8>,
-        rarime: Rarime,
+        rarime: &Rarime,
         passport: RarimePassport,
         query_proof: Vec<u8>,
     ) -> Result<Vec<u8>, RarimeError> {
@@ -303,10 +304,10 @@ impl Freedomtool {
         &self,
         answers: Vec<u8>,
         poll_data: ProposalData,
-        rarime: Rarime,
+        rarime: &Rarime,
         passport: RarimePassport,
     ) -> Result<String, RarimeError> {
-        self.validate(passport.clone(), rarime.clone(), poll_data.clone())
+        self.validate(passport.clone(), &rarime, poll_data.clone())
             .await?;
 
         let query_proof_params = self
