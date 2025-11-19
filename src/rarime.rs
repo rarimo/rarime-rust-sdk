@@ -1,5 +1,5 @@
 use crate::utils::{get_smt_proof_index, poseidon_hash_32_bytes, vec_u8_to_u8_32};
-use crate::{DocumentStatus, QueryProofParams, RarimeError, RarimePassport, rarime_utils};
+use crate::{DocumentStatus, QueryProofParams, RarimeError, RarimePassport};
 use api::ApiProvider;
 use api::types::relayer_light_register::{LiteRegisterData, LiteRegisterRequest};
 use api::types::verify_sod::{Attributes, Data, DocumentSod, VerifySodRequest, VerifySodResponse};
@@ -63,9 +63,12 @@ impl Rarime {
         &self,
         passport: RarimePassport,
     ) -> Result<DocumentStatus, RarimeError> {
-        let profile_key = rarime_utils::get_profile_key(&vec_u8_to_u8_32(
-            &self.config.user_configuration.user_private_key,
-        )?)?;
+        let rarime_utils = RarimeUtils::new();
+
+        let profile_key = vec_u8_to_u8_32(
+            &rarime_utils
+                .get_profile_key(self.config.user_configuration.user_private_key.clone())?,
+        )?;
 
         let passport_info = self.get_passport_info(&passport).await?;
 
