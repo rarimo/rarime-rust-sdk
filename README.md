@@ -48,7 +48,7 @@ This architecture allows us to:
 
 ---
 
-## 📦 Getting Started
+# 📦 Getting Started
 
 ## 🛠 Build Requirements
 
@@ -87,6 +87,15 @@ uniffi-bindgen generate ./rarime_rust_sdk.udl --language <target_language> --out
 > 🧠 The SDK’s core is fully portable — you can integrate it with any language or platform supported by UniFFI.
 > 🔗 For more detailed information about the supported languages and the binding generation process, please visit
 > the [UniFFI project page](https://github.com/mozilla/uniffi-rs).
+---
+
+## Build Instructions
+
+Here you can find instructions for compiling and using our SDK on different platforms:
+
+- **[Android](docs/Android-build.md)**
+- **iOS** (in progress)
+- **React Native** (in progress)
 
 ---
 
