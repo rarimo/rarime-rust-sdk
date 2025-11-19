@@ -1,4 +1,4 @@
-use crate::errors::ProofError;
+pub use crate::errors::ProofError;
 use crate::utils::bytes_to_string_array;
 use noir_rs::barretenberg::prove::prove_ultra_plonk;
 use noir_rs::barretenberg::srs::setup_srs;
