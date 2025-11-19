@@ -126,6 +126,30 @@ cp target/armv7-linux-androideabi/release/lib<crate_name>.so android/mylib/src/m
 uniffi-bindgen generate uniffi/my_sdk.udl --language kotlin --out-dir target/uniffi
 ```
 
+For Android-compatible bindings (point the bindgen at the compiled native library so generated code matches the actual
+.so layout). Run this after you build the .so for each ABI:
+
+```bash
+# example for arm64
+uniffi-bindgen generate uniffi/my_sdk.udl \
+  --language kotlin \
+  --library target/aarch64-linux-android/release/lib<crate_name>.so \
+  --out-dir target/uniffi
+
+# example for armeabi-v7a
+uniffi-bindgen generate uniffi/my_sdk.udl \
+  --language kotlin \
+  --library target/armv7-linux-androideabi/release/lib<crate_name>.so \
+  --out-dir target/uniffi
+```
+
+Repeat per ABI (or point to the ABI-specific .so) so the generated Kotlin code is compatible with the Android native
+libraries you ship.
+
+> Note: You can configure linker flags, targets, and other build settings in .cargo/config.toml instead of exporting
+> environment variables. This helps make builds reproducible and avoids setting global environment variables for each
+> session.
+
 ### 4.2 Copy to Android Module
 
 ```bash
