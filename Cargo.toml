@@ -12,28 +12,16 @@ crate-type = ["cdylib", "rlib", "staticlib"]
 [dependencies]
 asn1 = { git = "https://github.com/rarimo/rust-asn1", rev = "19db8629e2c1591b98a204740c0438031281db69" }
 base64 = "0.22.1"
-const-oid = "0.9.6"
+const-oid = { version = "0.9.6", features = ["db"] }
 digest = "0.10.7"
-env_logger = "0.11.7"
 hex = "0.4.3"
-lazy_static = "1.5.0"
-log = "0.4.26"
-num-bigint-dig = "=0.8.4"
-pem = "3.0.5"
 rsa = { version = "0.9.8", features = ["sha1", "sha2"] }
-serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 sha1 = "0.10.6"
 sha2 = "0.10.8"
 thiserror = "2.0.12"
-sha3 = "0.11.0-rc.3"
 num-traits = "0.2.19"
 num-bigint = "0.4.6"
-der = "0.7.9"
-regex = "1.11.1"
-cms = "0.2.3"
-x509-parser = "0.18.0"
-der-parser = "10.0.0"
 babyjubjub-rs = { version = "0.0.11", features = ["aarch64"] }
 simple_asn1 = "0.6.3"
 poseidon-rs = "0.0.10"
@@ -43,8 +31,6 @@ proofs = { path = "src/proofs" }
 api = { path = "src/api" }
 tokio = { version = "1.47.1", features = ["full"] }
 futures = "0.3.31"
-reqwest = "0.12.24"
-url = "2.5.7"
 uniffi = { version = "0.30.0", features = ["cli", "bindgen"] }
 chrono = "0.4.42"
 

@@ -1,11 +1,12 @@
+use crate::errors::ProofError;
 use crate::utils::bytes_to_string_array;
 use noir_rs::barretenberg::prove::prove_ultra_plonk;
 use noir_rs::barretenberg::srs::setup_srs;
 use noir_rs::witness::from_vec_str_to_witness_map;
 use serde_json::Value;
 use std::fs;
-use thiserror::Error;
 
+pub mod errors;
 mod utils;
 
 #[derive(Debug)]
@@ -139,20 +140,4 @@ impl ProofProvider {
 
         return Ok(proof);
     }
-}
-
-#[derive(Error, Debug)]
-pub enum ProofError {
-    #[error("I/O error: {0}")]
-    Io(#[from] std::io::Error),
-    #[error("JSON serialization error: {0}")]
-    Json(#[from] serde_json::Error),
-    #[error("SRS setup error: {0}")]
-    Srs(String),
-    #[error("Witness error: {0}")]
-    Witness(String),
-    #[error("Proving system error: {0}")]
-    ProvingError(String),
-    #[error("JSON structure missing field: {0}")]
-    MissingField(String),
 }

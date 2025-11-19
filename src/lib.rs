@@ -20,22 +20,14 @@ pub use rarime::{
 
 pub use rarimo_utils::RarimeUtils;
 
-pub use utils::rarime_utils;
-
-mod base64;
 pub mod document;
 pub mod errors;
 pub mod freedomtool;
 mod hash_algorithm;
-pub mod masters_certificate_pool;
-mod owned_cert;
-pub mod passport;
 pub mod poll;
 pub mod rarime;
 pub mod rarimo_utils;
-pub mod rfc;
 mod signature_algorithm;
-mod treap_tree;
 mod utils;
 
 // UniFFI setup
