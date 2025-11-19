@@ -23,29 +23,29 @@ mod tests {
             api_configuration: FreedomtoolAPIConfiguration {
                 voting_rpc_url: "https://rpc.qtestnet.org".to_string(),
                 ipfs_url: "https://ipfs.rarimo.com".to_string(),
-                relayer_url: "http://127.0.0.1:8000".to_string(),
+                relayer_url: "https://api.stage.freedomtool.org".to_string(),
             },
         };
 
         let freedomtool = Freedomtool::new(freedomtool_config);
 
-        let proposal_id: String = "217".to_string();
+        let proposal_id: String = "220".to_string();
 
         let poll_data = freedomtool.get_proposal_data(proposal_id).await.unwrap();
 
         let rarime_config = RarimeConfiguration {
             contracts_configuration: RarimeContractsConfiguration {
-                state_keeper_address: "0x9EDADB216C1971cf0343b8C687cF76E7102584DB".to_string(),
-                register_contract_address: "0xd63782478CA40b587785700Ce49248775398b045".to_string(),
-                poseidon_smt_address: "0xF19a85B10d705Ed3bAF3c0eCe3E73d8077Bf6481".to_string(),
+                state_keeper_address: "0x12883d5F530AF7EC2adD7cEC29Cf84215efCf4D8".to_string(),
+                register_contract_address: "0x1b6ae4b80F0f26DC53731D1d7aA31fc3996B513B".to_string(),
+                poseidon_smt_address: "0xb8bAac4C443097d697F87CC35C5d6B06dDe64D60".to_string(),
             },
             api_configuration: RarimeAPIConfiguration {
-                json_rpc_evm_url: "https://rpc.evm.mainnet.rarimo.com".to_string(),
+                json_rpc_evm_url: "https://rpc.qtestnet.org/".to_string(),
                 rarime_api_url: "https://api.orgs.app.stage.rarime.com".to_string(),
             },
             user_configuration: RarimeUserConfiguration {
                 user_private_key: hex::decode(
-                    "090ad31e17fa6d91dd575249db8e721262f988eac3bfe9b4d5366415a7995865", //TODO: Change this after light_register_test
+                    "0e5f8f6e7a5cddf009d1f9fbdc9429866927b5f6d8c974a673c912beeb00d825",
                 )
                 .unwrap(),
             },
@@ -53,18 +53,19 @@ mod tests {
 
         let rarime = Rarime::new(rarime_config).unwrap();
 
-        let json_string = fs::read_to_string("./tests/assets/passports/id_card3.json").unwrap();
+        let json_string = fs::read_to_string("./tests/assets/passports/id_card.json").unwrap();
         let json_value: Value = serde_json::from_str(&json_string).unwrap();
 
         let passport = RarimePassport {
             data_group1: STANDARD
                 .decode(json_value.get("dg1").unwrap().as_str().unwrap())
                 .unwrap(),
-            data_group15: Some(
-                STANDARD
-                    .decode(json_value.get("dg15").unwrap().as_str().unwrap())
-                    .unwrap(),
-            ),
+            data_group15: None,
+            // Some(
+            //     STANDARD
+            //         .decode(json_value.get("dg15").unwrap().as_str().unwrap())
+            //         .unwrap(),
+            // ),
             aa_signature: None,
             aa_challenge: None,
             sod: STANDARD
@@ -72,7 +73,7 @@ mod tests {
                 .unwrap(),
         };
 
-        let answers = vec![1];
+        let answers = vec![2];
 
         let result = tokio::task::spawn_blocking({
             move || {

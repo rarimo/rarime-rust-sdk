@@ -13,17 +13,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_light_registration() {
-        let json_string = fs::read_to_string("./tests/assets/passports/id_card.json").unwrap();
+        let json_string = fs::read_to_string("./tests/assets/passports/id_card3.json").unwrap();
         let json_value: Value = serde_json::from_str(&json_string).unwrap();
 
         let rarime_config = RarimeConfiguration {
             contracts_configuration: RarimeContractsConfiguration {
-                state_keeper_address: "0x9EDADB216C1971cf0343b8C687cF76E7102584DB".to_string(),
-                register_contract_address: "0xd63782478CA40b587785700Ce49248775398b045".to_string(),
-                poseidon_smt_address: "".to_string(),
+                state_keeper_address: "0x12883d5F530AF7EC2adD7cEC29Cf84215efCf4D8".to_string(),
+                register_contract_address: "0x1b6ae4b80F0f26DC53731D1d7aA31fc3996B513B".to_string(),
+                poseidon_smt_address: "0xb8bAac4C443097d697F87CC35C5d6B06dDe64D60".to_string(),
             },
             api_configuration: RarimeAPIConfiguration {
-                json_rpc_evm_url: "https://rpc.evm.mainnet.rarimo.com".to_string(),
+                json_rpc_evm_url: "https://rpc.qtestnet.org/".to_string(),
                 rarime_api_url: "https://api.orgs.app.stage.rarime.com".to_string(),
             },
             user_configuration: RarimeUserConfiguration {

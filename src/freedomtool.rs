@@ -120,6 +120,16 @@ impl Freedomtool {
         rarime: &Rarime,
         poll_data: ProposalData,
     ) -> Result<(), RarimeError> {
+        if (Utc::now().timestamp() as u64) < poll_data.start_timestamp {
+            return Err(RarimeError::ValidationError(
+                "Voting has not started".to_string(),
+            ));
+        }
+
+        if (Utc::now().timestamp() as u64) > (poll_data.start_timestamp + poll_data.poll_duration) {
+            return Err(RarimeError::ValidationError("Voting has ended".to_string()));
+        }
+
         passport.validate(&poll_data.criteria)?;
 
         rarime
