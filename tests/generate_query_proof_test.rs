@@ -81,7 +81,7 @@ mod tests {
         .unwrap();
 
         for (i, chunk) in result.chunks(32).take(24).enumerate() {
-            dbg!(format!("0x{}", hex::encode(chunk)));
+            dbg!(format!("{}: 0x{}", i + 1, hex::encode(chunk)));
         }
         dbg!(hex::encode(result[768..].to_vec()));
 
