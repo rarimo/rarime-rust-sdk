@@ -78,7 +78,7 @@ mod tests {
             move || {
                 futures::executor::block_on(async move {
                     freedomtool
-                        .send_vote(answers, poll_data, rarime, passport)
+                        .send_vote(answers, poll_data, &rarime, passport)
                         .await
                 })
             }

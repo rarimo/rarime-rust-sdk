@@ -59,7 +59,7 @@ pub enum RarimeError {
     ApiError(#[from] ApiError),
     #[error("Decode hex error: {0}")]
     DecodeHexError(#[from] FromHexError),
-    #[error("Profile key error: {0}")]
+    #[error("Vector size error: {0}")]
     VectorSizeValidationError(String),
     #[error("Setup SDK process error: {0}")]
     SetupSDKError(String),

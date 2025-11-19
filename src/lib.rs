@@ -5,11 +5,26 @@ pub use api::types::relayer_light_register::{
     RegisterResponseAttributes,
 };
 pub use document::RarimePassport;
+
+pub use freedomtool::{
+    Freedomtool, FreedomtoolAPIConfiguration, FreedomtoolConfiguration,
+    FreedomtoolContractsConfiguration,
+};
+
+pub use poll::{ProposalData, Question, VotingCriteria};
+
+pub use rarime::{
+    Rarime, RarimeAPIConfiguration, RarimeConfiguration, RarimeContractsConfiguration,
+    RarimeUserConfiguration,
+};
+
+pub use rarimo_utils::RarimeUtils;
+
 pub use utils::rarime_utils;
 
 mod base64;
-mod document;
-mod errors;
+pub mod document;
+pub mod errors;
 pub mod freedomtool;
 mod hash_algorithm;
 pub mod masters_certificate_pool;
@@ -22,8 +37,9 @@ pub mod rfc;
 mod signature_algorithm;
 mod treap_tree;
 mod utils;
-// /// UniFFI setup
-// uniffi::include_scaffolding!("rarime_rust_sdk");
+
+// UniFFI setup
+uniffi::include_scaffolding!("rarime_rust_sdk");
 
 #[derive(Debug, Clone)]
 pub struct QueryProofParams {
@@ -40,5 +56,3 @@ pub struct QueryProofParams {
     pub expiration_date_upperbound: String,
     pub citizenship_mask: String,
 }
-
-
